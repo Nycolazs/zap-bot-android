@@ -1,20 +1,20 @@
-# Arquitetura
+# Architecture
 
-O app segue camadas simples:
+The app follows a simple layered structure:
 
-- `ui`: telas Compose e ViewModel.
-- `service`: Foreground Service e BootReceiver.
-- `domain`: modelos, parser e motor do bot.
-- `database`: Room DAOs e entidades.
-- `data`: repositorios e limpeza de arquivos.
-- `whatsapp`: contrato `WhatsAppClient`, fake e skeleton QR bridge.
-- `youtube`: contrato e cliente YouTube Data API v3.
-- `downloader`: contrato, fake e skeleton para downloader real.
-- `queue`: fila de jobs e concorrencia.
-- `notifications`: notificacao persistente.
+- `ui`: Compose screens and ViewModel.
+- `service`: Foreground Service and BootReceiver.
+- `domain`: models, command parser, and bot engine.
+- `database`: Room DAOs and entities.
+- `data`: repositories and file cleanup.
+- `whatsapp`: `WhatsAppClient` contract, fake client, bridge clients, and the whatsmeow client.
+- `youtube`: search contract, fast web client, and YouTube Data API v3 client.
+- `downloader`: downloader contract, fake implementation, and youtubedl-android implementation.
+- `queue`: job queue and concurrency control.
+- `notifications`: persistent Android notification.
 
-O `BotEngine` nao depende da UI Android. Ele recebe mensagens, interpreta comandos, salva sessoes por chat, cria jobs e envia respostas pelo `WhatsAppClient`.
+`BotEngine` does not depend on the Android UI. It receives messages, interprets commands, stores per-chat sessions, creates jobs, and sends replies through `WhatsAppClient`.
 
-O `BotForegroundService` inicia imediatamente em foreground, sobe o cliente WhatsApp, observa mensagens, inicia a fila e atualiza notificacoes com status de conexao e downloads ativos.
+`BotForegroundService` starts in the foreground immediately, starts the WhatsApp client, observes incoming messages, starts the download queue, and updates notifications with connection status and active downloads.
 
-O banco Room impede perda de estado essencial. Ao iniciar, a fila marca jobs interrompidos como `FAILED` com mensagem segura, evitando que estados `DOWNLOADING` ou `SENDING` fiquem presos apos encerramento do processo.
+Room storage prevents essential state from being lost. On startup, interrupted jobs are marked as `FAILED` with a safe user-facing message, avoiding stuck `DOWNLOADING` or `SENDING` states after a process shutdown.

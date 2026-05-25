@@ -1,29 +1,29 @@
 # ZapTube Bot v1.1.0
 
-## Novidades
+## What's New
 
-- Nome do projeto e app atualizado para ZapTube Bot.
-- Pesquisa do YouTube agora mostra data de publicacao.
-- Entrega de video/audio tambem informa a data de publicacao.
-- Resultados continuam trazendo titulo, canal e duracao.
-- Downloads por `/v1` e `/a1`, incluindo suporte a responder uma mensagem antiga de pesquisa.
-- Audio em MP3 com titulo, artista/canal e thumbnail como capa quando disponivel.
-- Tela de jobs mostra apenas as ultimas 24 horas.
-- Alertas enviados para o grupo `Alerta Music Bot`.
+- Project and app name updated to ZapTube Bot.
+- YouTube search results now include the video publication date.
+- Video/audio delivery messages also include the publication date.
+- Results still include title, channel, and duration.
+- Downloads are selected with `/v1` and `/a1`, including support for replying to an older search message.
+- Audio is sent as MP3 with title, channel/artist, and thumbnail cover art when available.
+- The jobs screen only shows jobs from the last 24 hours.
+- Runtime and error alerts are sent to the `Alerta Music Bot` WhatsApp group.
 
-## Como instalar
+## How to Install
 
-1. Baixe o arquivo `ZapTube-Bot-v1.1.0.apk` neste release.
-2. Instale no celular Android que vai rodar o bot.
-3. Abra o app `ZapTube Bot`.
-4. Em `Settings`, gere o codigo de pareamento com o numero do WhatsApp.
-5. No WhatsApp principal, entre em `Aparelhos conectados` e conecte usando o codigo.
-6. Toque em `Start bot`.
+1. Download `ZapTube-Bot-v1.1.0.apk` from this release.
+2. Install it on the Android phone that will run the bot.
+3. Open the `ZapTube Bot` app.
+4. In `Settings`, generate a pairing code using the WhatsApp phone number.
+5. On the main WhatsApp phone, open `Linked devices` and connect using the pairing code.
+6. Tap `Start bot`.
 
-## Comandos principais
+## Main Commands
 
-- `/help`: ajuda.
-- `/{pesquisa}`: pesquisa no YouTube. Exemplo: `/abertura pokemon`.
-- `/v1`: envia o video do resultado 1.
-- `/a1`: envia o audio do resultado 1.
-- Responder uma mensagem de pesquisa com `/v1` ou `/a1`: usa aquela pesquisa respondida.
+- `/help`: show help.
+- `/{search query}`: search YouTube. Example: `/pokemon opening`.
+- `/v1`: send the video from result 1.
+- `/a1`: send the audio from result 1.
+- Reply to a search message with `/v1` or `/a1`: use the replied search results instead of the latest search in the chat.

@@ -1,25 +1,25 @@
-# Testes
+# Testing
 
-Execute:
+Run:
 
 ```bash
 ./gradlew test
 ```
 
-Cobertura inicial:
+Initial coverage:
 
-- Parser de comandos.
-- Sanitizacao de nomes de arquivos.
-- Clientes fake de YouTube e downloader.
+- Command parser.
+- File name sanitization.
+- Fake YouTube and downloader clients.
 
-Para testar fluxo ponta a ponta sem WhatsApp real, injete `FakeWhatsAppClient`, `FakeYouTubeSearchClient` e `FakeMediaDownloader`, envie mensagens com `FakeWhatsAppClient.receive(...)` e valide `sentTexts`/`sentMedia`.
+To test the end-to-end flow without a real WhatsApp connection, inject `FakeWhatsAppClient`, `FakeYouTubeSearchClient`, and `FakeMediaDownloader`, send messages with `FakeWhatsAppClient.receive(...)`, and validate `sentTexts`/`sentMedia`.
 
-Casos que devem ser mantidos em testes ao evoluir:
+Cases that should remain covered as the project evolves:
 
-- Sessoes de pesquisa separadas por `chatId`.
-- Expiracao de sessao em 30 minutos.
-- Um download ativo por chat.
-- Downloads concorrentes entre chats diferentes.
-- Estados `QUEUED`, `DOWNLOADING`, `SENDING`, `COMPLETED`, `FAILED`, `CANCELLED`.
-- Limpeza de arquivos apos envio.
-- Mapeamento de erros seguros para o usuario.
+- Search sessions isolated by `chatId`.
+- Session expiration after 30 minutes.
+- One active download per chat.
+- Concurrent downloads across different chats.
+- Job states: `QUEUED`, `DOWNLOADING`, `SENDING`, `COMPLETED`, `FAILED`, `CANCELLED`.
+- File cleanup after sending.
+- Safe error mapping for user-facing messages.

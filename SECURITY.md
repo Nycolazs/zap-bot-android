@@ -1,10 +1,10 @@
-# Segurança e conformidade
+# Security and Compliance
 
-- Nao coloque chaves de API no codigo-fonte.
-- Nao baixe conteudo sem permissao, conteudo privado, pago, com DRM, bloqueio etario ou qualquer controle de acesso.
-- A sessao do WhatsApp deve ficar em armazenamento privado do app.
-- A acao "Limpar sessao do WhatsApp" deve apagar arquivos privados do adaptador real.
-- Logs nao devem conter tokens, QR bruto persistido, cookies, sessoes ou caminhos sensiveis.
-- Arquivos temporarios ficam em `cache/bot_jobs/{jobId}` e sao apagados apos envio quando configurado.
-- Nomes de arquivo sao sanitizados para evitar path traversal.
-- A notificacao de foreground nunca deve ser ocultada.
+- Do not commit API keys to source control.
+- Do not download content without permission, including private, paid, DRM-protected, age-restricted, or access-controlled content.
+- WhatsApp session data must remain in private app storage.
+- The `Clear WhatsApp session` action must remove private files used by the real adapter.
+- Logs must not contain tokens, persisted raw QR data, cookies, sessions, or sensitive file paths.
+- Temporary files are stored in `cache/bot_jobs/{jobId}` and are deleted after sending when configured.
+- File names are sanitized to prevent path traversal.
+- The foreground notification must never be hidden while the bot is running.

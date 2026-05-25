@@ -1,8 +1,8 @@
 # ZapTube Bot WhatsApp Bridge
 
-Bridge local nao-oficial usando Baileys para conectar um WhatsApp pessoal por codigo de pareamento.
+Local unofficial bridge using Baileys to connect a personal WhatsApp account with a pairing code.
 
-## Rodar
+## Run
 
 ```bash
 cd whatsapp-bridge
@@ -10,16 +10,16 @@ npm install
 npm start
 ```
 
-O app Android esta configurado para chamar `http://192.168.0.85:8787/`.
+The Android app is configured to call `http://192.168.0.85:8787/`.
 
-No app:
+In the app:
 
-1. Abra `Ajustes`.
-2. Digite o numero com DDI e DDD, por exemplo `5585999999999`.
-3. Toque em `Gerar codigo de pareamento`.
-4. No WhatsApp: `Aparelhos conectados` > `Conectar com numero de telefone`.
-5. Digite o codigo mostrado no app.
+1. Open `Settings`.
+2. Enter the phone number with country and area code, for example `5585999999999`.
+3. Tap `Generate pairing code`.
+4. In WhatsApp: `Linked devices` > `Link with phone number`.
+5. Enter the code shown by the app.
 
-## Observacao
+## Note
 
-Baileys usa o protocolo do WhatsApp Web e nao e uma API oficial da Meta. Pode quebrar com mudancas do WhatsApp e deve ser usado respeitando limites e politicas da plataforma.
+Baileys uses the WhatsApp Web protocol and is not an official Meta API. It may break when WhatsApp changes its protocol and should be used while respecting platform limits and policies.
