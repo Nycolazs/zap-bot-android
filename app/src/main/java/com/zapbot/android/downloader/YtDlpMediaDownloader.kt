@@ -29,7 +29,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         val request = baseRequest(video, outputDir).apply {
             addOption(
                 "-f",
-                "best[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4]/worst"
+                "best[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4]"
             )
             addOption("--merge-output-format", "mp4")
             addOption("-S", "res:$height,ext:mp4:m4a,+size")
@@ -63,6 +63,9 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             ?.filter { it.isFile && it.length() > 0L && !it.name.endsWith(".part") && it.extension.lowercase() in MEDIA_EXTENSIONS }
             ?.maxByOrNull { it.lastModified() }
             ?: error("Arquivo baixado não encontrado")
+        if (file.extension.isBlank()) {
+            error("Arquivo baixado sem extensão de mídia válida")
+        }
         DownloadResult(file, mimeType(file))
     }
 
@@ -150,7 +153,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
 
     private companion object {
         const val SAFE_VIDEO_HEIGHT = 360
-        const val SAFE_VIDEO_UPLOAD_BYTES = 55L * 1024L * 1024L
+        const val SAFE_VIDEO_UPLOAD_BYTES = 1536L * 1024L * 1024L
         val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm")
         const val YOUTUBE_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36"

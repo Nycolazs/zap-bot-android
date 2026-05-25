@@ -67,6 +67,7 @@ class DownloadQueueManager(
             flow.collectLatest { progress -> update(request.jobId, DownloadStatus.DOWNLOADING, progress.percent) }
             update(request.jobId, DownloadStatus.SENDING, 100)
             val result = downloader.resultFile(outputDir)
+            validateWhatsAppMedia(request, result.file)
             whatsappClient.sendMedia(request.chatId, result.file, completedCaption(request), request.messageId)
             jobDao.finish(request.jobId, DownloadStatus.COMPLETED, null)
             alert("✅ *Envio concluído*\n\n_Título:_ ${request.video.title}\n_Tipo:_ ${request.type}\n_Tamanho:_ ${formatSize(result.file.length())}")
@@ -116,6 +117,15 @@ class DownloadQueueManager(
         """.trimIndent()
     }
 
+    private fun validateWhatsAppMedia(request: DownloadRequest, file: java.io.File) {
+        if (request.type == DownloadType.VIDEO && file.length() > MAX_WHATSAPP_VIDEO_BYTES) {
+            error("O vídeo ficou acima do limite de envio do bot (${formatSize(file.length())}). O limite atual é ${formatSize(MAX_WHATSAPP_VIDEO_BYTES)}.")
+        }
+        if (request.type == DownloadType.VIDEO && file.extension.lowercase() !in VIDEO_EXTENSIONS) {
+            error("O downloader gerou um arquivo que não é vídeo compatível: .${file.extension}")
+        }
+    }
+
     private fun alert(text: String) {
         scope.launch(Dispatchers.IO) {
             runCatching { whatsappClient.sendTextToGroupName(ALERT_GROUP_NAME, text) }
@@ -124,10 +134,16 @@ class DownloadQueueManager(
 
     private fun formatSize(bytes: Long): String {
         val mb = bytes / 1024.0 / 1024.0
-        return "%.1f MB".format(mb)
+        return if (mb >= 1024.0) {
+            "%.2f GB".format(mb / 1024.0)
+        } else {
+            "%.1f MB".format(mb)
+        }
     }
 
     private companion object {
         const val ALERT_GROUP_NAME = "Alerta Music Bot"
+        const val MAX_WHATSAPP_VIDEO_BYTES = 1536L * 1024L * 1024L
+        val VIDEO_EXTENSIONS = setOf("mp4", "webm")
     }
 }

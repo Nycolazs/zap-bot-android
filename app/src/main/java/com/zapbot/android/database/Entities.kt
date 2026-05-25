@@ -16,6 +16,7 @@ data class BotSettingsEntity(
     val videoQualityLimit: String = "480p",
     val audioBitrate: String = "128k",
     val deleteFilesAfterSending: Boolean = true,
+    val themeMode: String = "system",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

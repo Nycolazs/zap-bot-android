@@ -25,6 +25,11 @@ private val Dark = darkColorScheme(
 )
 
 @Composable
-fun ZapBotTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, content = content)
+fun ZapBotTheme(themeMode: String = "system", content: @Composable () -> Unit) {
+    val darkTheme = when (themeMode) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
+    MaterialTheme(colorScheme = if (darkTheme) Dark else Light, content = content)
 }

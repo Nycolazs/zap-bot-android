@@ -52,7 +52,7 @@ class BotEngine(
             val sentMessageId = whatsapp.sendText(message.chatId, formatSearchResults(query, results), message.id)
             sessions.save(message.chatId, query, results, sentMessageId)
             alert("✅ *Pesquisa enviada*\n\n_Busca:_ $query\n_Resultados:_ ${results.size}")
-            logger.info("BotEngine", "Search completed for chat ${message.chatId}")
+            logger.info("BotEngine", "Search completed for ${message.senderLabel()}")
         } catch (t: Throwable) {
             logger.error("BotEngine", "Search failed", t)
             alert("🚨 *Erro na pesquisa*\n\n_Busca:_ $query\n_Motivo:_ ${safeError(t)}")
@@ -226,3 +226,12 @@ class BotEngine(
         const val ALERT_GROUP_NAME = "Alerta Music Bot"
     }
 }
+
+private fun IncomingWhatsAppMessage.senderLabel(): String =
+    senderName?.takeIf { it.isNotBlank() } ?: chatId.toReadableChatId()
+
+private fun String.toReadableChatId(): String =
+    substringBefore("@")
+        .filter { it.isDigit() || it == '+' }
+        .takeIf { it.isNotBlank() }
+        ?: "WhatsApp contact"

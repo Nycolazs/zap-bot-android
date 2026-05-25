@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import com.zapbot.android.ZapBotApplication
 import com.zapbot.android.domain.BotCommandParser
 import com.zapbot.android.domain.BotEngine
+import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
 import com.zapbot.android.notifications.BotNotificationManager
 import com.zapbot.android.queue.DownloadQueueManager
@@ -68,7 +69,7 @@ class BotForegroundService : Service() {
                 .catch { container.logger.error("Service", "Message stream failed", it) }
                 .collect {
                     scope.launch(Dispatchers.IO) {
-                        container.logger.info("Service", "Message received from chat ${it.chatId}")
+                        container.logger.info("Service", "Message received from ${it.senderLabel()}")
                         engine.handle(it)
                     }
                 }
@@ -121,3 +122,12 @@ class BotForegroundService : Service() {
         }
     }
 }
+
+private fun IncomingWhatsAppMessage.senderLabel(): String =
+    senderName?.takeIf { it.isNotBlank() } ?: chatId.toReadableChatId()
+
+private fun String.toReadableChatId(): String =
+    substringBefore("@")
+        .filter { it.isDigit() || it == '+' }
+        .takeIf { it.isNotBlank() }
+        ?: "WhatsApp contact"

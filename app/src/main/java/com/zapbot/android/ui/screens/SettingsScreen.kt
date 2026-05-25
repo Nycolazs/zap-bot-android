@@ -16,8 +16,9 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +49,7 @@ fun SettingsScreen(
     hasWhatsAppSession: Boolean,
     onUpdate: ((BotSettingsEntity) -> BotSettingsEntity) -> Unit,
     onClearSession: () -> Unit,
+    onBattery: () -> Unit,
     onRequestPairingCode: (String) -> Unit,
     pairingCode: String?,
     pairingError: String?
@@ -167,8 +169,13 @@ fun SettingsScreen(
         ToggleRow("Start when the phone boots", settings.autoStartOnBoot) { onUpdate { it.copy(autoStartOnBoot = !it.autoStartOnBoot) } }
         ToggleRow("Notifications", settings.notificationsEnabled) { onUpdate { it.copy(notificationsEnabled = !it.notificationsEnabled) } }
         ToggleRow("Detailed notifications", settings.detailedNotificationsEnabled) { onUpdate { it.copy(detailedNotificationsEnabled = !it.detailedNotificationsEnabled) } }
-        ToggleRow("Delete files after sending", settings.deleteFilesAfterSending) { onUpdate { it.copy(deleteFilesAfterSending = !it.deleteFilesAfterSending) } }
-        Divider()
+        ThemeModeSection(settings.themeMode) { themeMode ->
+            onUpdate { it.copy(themeMode = themeMode) }
+        }
+        FilledTonalButton(onClick = onBattery, modifier = Modifier.fillMaxWidth()) {
+            Text("Open battery settings")
+        }
+        HorizontalDivider()
         Text("Simultaneous downloads", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (1..5).forEach { value ->
@@ -192,6 +199,26 @@ fun SettingsScreen(
 }
 
 private const val PAIRING_CODE_COOLDOWN_SECONDS = 15
+
+@Composable
+private fun ThemeModeSection(themeMode: String, onThemeModeChange: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Appearance", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                "system" to "System",
+                "light" to "Light",
+                "dark" to "Dark"
+            ).forEach { (value, label) ->
+                FilterChip(
+                    selected = themeMode == value,
+                    onClick = { onThemeModeChange(value) },
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
 
 private fun sessionStatus(connection: WhatsAppConnectionState): String = when (connection) {
     is WhatsAppConnectionState.Connected -> "This bot already has a saved WhatsApp session${connection.phoneNumber?.let { " for $it" }.orEmpty()}."

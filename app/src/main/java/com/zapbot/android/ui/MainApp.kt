@@ -1,6 +1,9 @@
 package com.zapbot.android.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
@@ -12,17 +15,21 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.zapbot.android.ui.screens.HomeScreen
 import com.zapbot.android.ui.screens.JobsScreen
 import com.zapbot.android.ui.screens.LogsScreen
 import com.zapbot.android.ui.screens.SettingsScreen
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainApp(
     viewModel: MainViewModel,
@@ -31,15 +38,30 @@ fun MainApp(
     onBattery: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-    var tab by remember { mutableIntStateOf(0) }
     val items = listOf("Home", "Jobs", "Logs", "Settings")
+    val pagerState = rememberPagerState(pageCount = { items.size })
+    val scope = rememberCoroutineScope()
+    var showErrorsOnly by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != 2) showErrorsOnly = false
+    }
+
+    fun openErrors() {
+        showErrorsOnly = true
+        scope.launch { pagerState.animateScrollToPage(2) }
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar {
                 items.forEachIndexed { index, label ->
                     NavigationBarItem(
-                        selected = tab == index,
-                        onClick = { tab = index },
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            if (index != 2) showErrorsOnly = false
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        },
                         icon = {
                             Icon(
                                 when (index) {
@@ -58,21 +80,24 @@ fun MainApp(
         }
     ) { padding ->
         val modifier = Modifier.padding(padding)
-        when (tab) {
-            0 -> HomeScreen(modifier, state, onStart, onStop, onBattery)
-            1 -> JobsScreen(modifier, state.jobs)
-            2 -> LogsScreen(modifier, state.logs, onClear = viewModel::clearLogs)
-            3 -> SettingsScreen(
-                modifier,
-                state.settings,
-                state.connection,
-                state.hasWhatsAppSession,
-                viewModel::updateSettings,
-                viewModel::clearSession,
-                viewModel::requestPairingCode,
-                state.lastPairingCode,
-                state.pairingError
-            )
+        HorizontalPager(state = pagerState, modifier = modifier) { page ->
+            when (page) {
+                0 -> HomeScreen(Modifier, state, onStart, onStop, onFailedClick = ::openErrors)
+                1 -> JobsScreen(Modifier, state.jobs)
+                2 -> LogsScreen(Modifier, state.logs, showErrorsOnly = showErrorsOnly, onClear = viewModel::clearLogs)
+                3 -> SettingsScreen(
+                    Modifier,
+                    state.settings,
+                    state.connection,
+                    state.hasWhatsAppSession,
+                    viewModel::updateSettings,
+                    viewModel::clearSession,
+                    onBattery,
+                    viewModel::requestPairingCode,
+                    state.lastPairingCode,
+                    state.pairingError
+                )
+            }
         }
     }
 }

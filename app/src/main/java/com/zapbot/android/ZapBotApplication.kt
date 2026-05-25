@@ -28,7 +28,9 @@ class ZapBotApplication : Application() {
 }
 
 class AppContainer(app: Application) {
-    val database: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "zapbot.db").build()
+    val database: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "zapbot.db")
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
     val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     val settings = SettingsRepository(database.settingsDao())
     val logger = BotLogger(database.logDao())

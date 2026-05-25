@@ -10,6 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.zapbot.android.service.BotForegroundService
 import com.zapbot.android.ui.MainApp
 import com.zapbot.android.ui.MainViewModel
@@ -20,12 +22,15 @@ class MainActivity : ComponentActivity() {
         MainViewModel.Factory((application as ZapBotApplication).container)
     }
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val contactsPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= 33) permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         setContent {
-            ZapBotTheme {
+            val state by viewModel.state.collectAsState()
+            ZapBotTheme(themeMode = state.settings.themeMode) {
                 MainApp(
                     viewModel = viewModel,
                     onStart = { BotForegroundService.start(this) },
