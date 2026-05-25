@@ -25,14 +25,14 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         outputDir.mkdirs()
         clearOutput(outputDir)
         emit(DownloadProgress(0, "Preparando download"))
-        val height = qualityLimit.filter(Char::isDigit).toIntOrNull() ?: 720
+        val height = (qualityLimit.filter(Char::isDigit).toIntOrNull() ?: 360).coerceAtMost(SAFE_VIDEO_HEIGHT)
         val request = baseRequest(video, outputDir).apply {
             addOption(
                 "-f",
-                "best[height<=$height][ext=mp4]/bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best"
+                "best[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4]/worst"
             )
             addOption("--merge-output-format", "mp4")
-            addOption("-S", "res:$height,ext:mp4:m4a,filesize")
+            addOption("-S", "res:$height,ext:mp4:m4a,+size")
         }
         emit(DownloadProgress(5, "Baixando vídeo"))
         executeAndValidate(request, processId(jobId), outputDir)
@@ -149,6 +149,8 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
     }
 
     private companion object {
+        const val SAFE_VIDEO_HEIGHT = 360
+        const val SAFE_VIDEO_UPLOAD_BYTES = 55L * 1024L * 1024L
         val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm")
         const val YOUTUBE_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36"

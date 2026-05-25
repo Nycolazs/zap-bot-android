@@ -209,11 +209,26 @@ func (b *Bridge) SendMedia(chatID string, path string, caption string, mime stri
 	defer cancel()
 	upload, err := client.Upload(ctx, data, mediaType)
 	if err != nil {
-		return err
+		if mediaType == whatsmeow.MediaVideo && isUploadTooLarge(err) {
+			mediaType = whatsmeow.MediaDocument
+			mime = "application/octet-stream"
+			upload, err = client.Upload(ctx, data, mediaType)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	message := mediaMessage(mediaType, upload, caption, filepath.Base(path), mime)
 	_, err = client.SendMessage(ctx, jid, message)
 	return err
+}
+
+func isUploadTooLarge(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "413") || strings.Contains(message, "too large") || strings.Contains(message, "request entity")
 }
 
 func (b *Bridge) clientLocked(reset bool) (*whatsmeow.Client, error) {

@@ -108,13 +108,17 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
     }
 
     private fun mimeType(file: File): String = when (file.extension.lowercase()) {
-        "mp4" -> "video/mp4"
+        "mp4" -> if (file.length() > MAX_DIRECT_VIDEO_BYTES) "application/octet-stream" else "video/mp4"
         "m4a" -> "audio/mp4"
         "mp3" -> "audio/mpeg"
         "ogg", "opus" -> "audio/ogg"
         "jpg", "jpeg" -> "image/jpeg"
         "png" -> "image/png"
         else -> "application/octet-stream"
+    }
+
+    private companion object {
+        const val MAX_DIRECT_VIDEO_BYTES = 55L * 1024L * 1024L
     }
 
     private fun refreshSavedSession() {
