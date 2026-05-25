@@ -1,0 +1,681 @@
+PROMPT PARA O CODEX — APP ANDROID KOTLIN PARA BOT DE WHATSAPP + YOUTUBE
+
+You are a senior Android/Kotlin architect and developer. Build a complete professional Android application in Kotlin that runs a WhatsApp bot on an Android phone 24/7.
+
+The app must be production-quality, cleanly architected, secure, robust, and easy to maintain. Think deeply before coding. Do not generate a toy prototype. Generate a real project structure with working code, clear modules, error handling, logging, local persistence, foreground service, queue system, and a modern UI.
+
+IMPORTANT LEGAL/COMPLIANCE REQUIREMENTS:
+- The app must only download and send YouTube content when the user has rights/permission to use that content, such as their own videos, public domain videos, Creative Commons content, or otherwise authorized content.
+- Do not bypass DRM, paywalls, private content, age restrictions, or any access controls.
+- Do not implement anything intended for copyright infringement.
+- Respect WhatsApp and YouTube platform policies as much as possible.
+- If a fully compliant official WhatsApp QR-code login is not available, clearly document that limitation and implement the WhatsApp integration through a replaceable adapter/interface.
+- Do not fake a working WhatsApp QR integration if the selected library/protocol cannot reliably run on Android.
+
+MAIN OBJECTIVE:
+Create an Android app in Kotlin that runs a WhatsApp bot. A person sends a message to the bot on WhatsApp, searches for a YouTube video, chooses one of the returned results, then receives either the video file or audio file.
+
+BOT BEHAVIOR:
+1. User sends:
+   /pesquisa search terms here
+
+2. Bot searches YouTube and returns the first 8 normal video results.
+
+3. Search results must NOT include:
+   - playlists
+   - channels
+   - YouTube Shorts
+   - live streams, if possible
+   - premieres, if possible
+   - unavailable/private/deleted videos
+
+4. The result message should be clean and numbered:
+   1. Video title
+      Channel: channel name
+      Duration: mm:ss
+      Link: https://youtube.com/watch?v=...
+
+   2. ...
+
+5. User then sends:
+   /v 1
+   to download/send the selected result as video.
+
+6. User sends:
+   /a 1
+   to download/send the selected result as audio.
+
+7. User can send:
+   /help
+   and the bot must explain usage in a simple way.
+
+8. User can send:
+   /status
+   and the bot should reply with the current status of their active job, if any.
+
+9. User can send:
+   /cancel
+   and the bot should cancel their pending/current job if possible.
+
+10. The bot must remember the last search results per WhatsApp user/chat, so when one user sends /v 1, it uses that user’s own search results and never another user’s search results.
+
+APP REQUIREMENTS:
+The Android app must:
+- Be written primarily in Kotlin.
+- Use modern Android architecture.
+- Use Jetpack Compose for UI.
+- Use Material 3.
+- Have a beautiful, simple, professional interface.
+- Allow the user to start the bot.
+- Allow the user to stop the bot.
+- Allow the user to clear the WhatsApp session.
+- Allow the user to connect the WhatsApp number using QR Code, if using a QR-based WhatsApp Web bridge.
+- Show the current connection status:
+  - Disconnected
+  - Waiting for QR Code
+  - Connected
+  - Running
+  - Error
+- Show the last error in the UI.
+- Show basic statistics:
+  - Bot uptime
+  - Messages received
+  - Searches performed
+  - Downloads completed
+  - Failed jobs
+  - Active jobs
+- Have a setting to enable/disable detailed notifications.
+- Have logs visible inside the app.
+- Store local settings and necessary state locally.
+- Not use Firebase.
+- Not require a remote server unless absolutely necessary.
+- Run on Android as continuously as possible.
+
+24/7 BACKGROUND REQUIREMENTS:
+Implement this correctly for Android:
+- Use a Foreground Service for the bot runtime.
+- The foreground service must show a persistent notification while the bot is running.
+- Notification must show:
+  - Bot running
+  - WhatsApp connection status
+  - Active downloads count
+  - Last error if there is a problem
+- If the bot crashes or loses connection, update the notification.
+- Add action buttons in the notification:
+  - Stop bot
+  - Open app
+- Request POST_NOTIFICATIONS permission on Android 13+.
+- Register BOOT_COMPLETED receiver so the bot can restart after the device reboots if the user enabled “start on boot”.
+- Add an in-app setting:
+  - Start bot automatically when phone turns on
+- Add guidance screen telling the user to disable battery optimization for this app.
+- Request ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS when appropriate.
+- Never try to hide the foreground notification.
+- Use proper foreground service type declarations for modern Android versions.
+- Handle Android 14+ foreground service restrictions properly.
+- Do not rely only on WorkManager for a permanent bot process. WorkManager may be used for cleanup/retry jobs, but the live bot must be controlled by a Foreground Service.
+
+ARCHITECTURE REQUIREMENTS:
+Use a clean architecture style:
+
+app/
+  ui/
+  service/
+  domain/
+  data/
+  whatsapp/
+  youtube/
+  downloader/
+  queue/
+  database/
+  notifications/
+  logging/
+  settings/
+
+Suggested layers:
+- UI Layer:
+  Jetpack Compose screens and ViewModels.
+- Domain Layer:
+  Use cases, entities, interfaces.
+- Data Layer:
+  Room database, repositories, local settings.
+- Integration Layer:
+  WhatsApp client adapter, YouTube API client, downloader/encoder.
+- Service Layer:
+  Foreground service orchestrating the bot runtime.
+
+Use dependency injection:
+- Prefer Hilt.
+- If Hilt adds too much setup, use a clean manual DI container, but structure it professionally.
+
+LOCAL DATABASE:
+Use Room for local persistence.
+
+Create entities/tables for:
+1. BotSettings
+   - id
+   - autoStartOnBoot
+   - notificationsEnabled
+   - detailedNotificationsEnabled
+   - maxConcurrentDownloads
+   - videoQualityLimit
+   - audioBitrate
+   - deleteFilesAfterSending
+   - createdAt
+   - updatedAt
+
+2. ChatSearchSession
+   - chatId
+   - query
+   - resultsJson
+   - createdAt
+   - expiresAt
+
+3. DownloadJob
+   - id
+   - chatId
+   - messageId
+   - youtubeVideoId
+   - title
+   - type: VIDEO or AUDIO
+   - status: QUEUED, DOWNLOADING, PROCESSING, SENDING, COMPLETED, FAILED, CANCELLED
+   - progress
+   - errorMessage
+   - outputFilePath
+   - createdAt
+   - updatedAt
+   - completedAt
+
+4. BotLog
+   - id
+   - level
+   - tag
+   - message
+   - throwable
+   - createdAt
+
+Search sessions should expire automatically after a safe time, for example 30 minutes.
+
+YOUTUBE SEARCH REQUIREMENTS:
+Use the official YouTube Data API v3 for searching.
+
+Implement YouTubeSearchClient:
+- Method:
+  suspend fun searchVideos(query: String, maxResults: Int = 8): List<YouTubeVideoResult>
+
+Search rules:
+- Use search.list with:
+  - part=snippet
+  - q=query
+  - type=video
+  - maxResults higher than 8 initially, for example 15 or 20, then filter down to 8
+  - safeSearch=none or moderate, configurable
+  - videoEmbeddable=true if appropriate
+  - videoSyndicated=true if appropriate
+  - videoDuration=medium or long if the user wants to exclude Shorts strongly
+- After getting candidate video IDs, call videos.list with:
+  - part=contentDetails,status,snippet,liveStreamingDetails
+- Filter out:
+  - videos shorter than 61 seconds if treating Shorts as under 60 seconds
+  - videos with vertical/shorts indicators if available
+  - live broadcasts
+  - private/unavailable videos
+  - channels/playlists, which should already be excluded by type=video
+- Return exactly up to 8 clean normal videos.
+- Include duration parsed from ISO 8601 to human-readable format.
+- Include title, channel, videoId, url, duration, thumbnail URL.
+
+Do not scrape the YouTube search page. Use the API for search.
+
+DOWNLOADING REQUIREMENTS:
+Implement a DownloaderManager with a safe abstraction.
+
+Important:
+- Only download authorized content.
+- Do not bypass DRM or restricted content.
+- Prefer a downloader tool/library that can be invoked locally and supports metadata/progress.
+- If using yt-dlp or a similar downloader, make it a replaceable component behind an interface:
+  interface MediaDownloader {
+      suspend fun downloadVideo(...)
+      suspend fun downloadAudio(...)
+  }
+
+The app must be able to:
+- Download video with a size-conscious quality setting.
+- Download audio as MP3 or M4A/Opus depending on compatibility with WhatsApp sending.
+- Compress/transcode video if needed.
+- Avoid sending files larger than WhatsApp limits.
+- If the file is too large:
+  - try lower quality
+  - if still too large, tell the user the file is too large and suggest audio instead
+- Show progress in database, UI, logs, and notification.
+- Delete the file automatically after successful sending if deleteFilesAfterSending=true.
+- Also clean old temp files on startup.
+
+Recommended file handling:
+- Store temp downloads under app-specific cache directory.
+- Never store in public Downloads unless explicitly configured.
+- Use unique job folders:
+  cache/bot_jobs/{jobId}/
+- After send success:
+  delete job folder.
+- After failure:
+  keep only logs/metadata, delete partial large files.
+
+ASYNC / CONCURRENCY REQUIREMENTS:
+This is very important.
+
+The bot must support several WhatsApp users at the same time without mixing states.
+
+Use Kotlin coroutines with structured concurrency:
+- SupervisorJob for the bot runtime.
+- CoroutineScope tied to the Foreground Service lifecycle.
+- Use Dispatchers.IO for network/download/file operations.
+- Use Mutex where needed.
+- Use Channel or Flow for incoming WhatsApp messages.
+- Use a queue system for download jobs.
+
+Implement:
+- DownloadQueueManager
+- Configurable maxConcurrentDownloads, default 2 or 3.
+- Per-chat sequential safety:
+  - One user can have only one active download at a time by default, or make it configurable.
+  - Different users can download concurrently.
+- Global rate limiting:
+  - Avoid starting too many searches/downloads at once.
+- Retry with exponential backoff for temporary failures.
+- Do not lose jobs if the app process is killed:
+  - Persist queued/running jobs in Room.
+  - On service restart, recover unfinished jobs safely.
+  - Mark interrupted jobs as FAILED or QUEUED depending on state.
+- Do not send the wrong file to the wrong chat.
+- Each job must always keep:
+  - chatId
+  - original WhatsApp message id
+  - selected video id
+  - media type
+  - output path
+  - status
+
+WHATSAPP INTEGRATION REQUIREMENTS:
+Create a clean interface:
+
+interface WhatsAppClient {
+    val connectionState: Flow<WhatsAppConnectionState>
+    val incomingMessages: Flow<IncomingWhatsAppMessage>
+
+    suspend fun start()
+    suspend fun stop()
+    suspend fun clearSession()
+    suspend fun sendText(chatId: String, text: String, replyToMessageId: String? = null)
+    suspend fun sendMedia(chatId: String, file: File, caption: String? = null, replyToMessageId: String? = null)
+}
+
+IncomingWhatsAppMessage:
+- id
+- chatId
+- senderName
+- text
+- timestamp
+
+WhatsAppConnectionState:
+- Disconnected
+- WaitingForQr(qrData: String)
+- Connecting
+- Connected(phoneNumber: String?)
+- Running
+- Error(message: String, throwable: Throwable?)
+
+Implementation strategy:
+1. First analyze the best realistic WhatsApp integration option for Android.
+2. Prefer official/compliant integration where possible.
+3. If using WhatsApp Business Cloud API:
+   - Explain that QR Code login is not the same as WhatsApp Web.
+   - Implement CloudApiWhatsAppClient.
+   - It may require webhook/server, so if not possible fully on-device, document this.
+4. If QR Code login is mandatory:
+   - Implement a QR-based WhatsApp Web bridge as a replaceable module.
+   - Options may include:
+     - embedded local Node.js runtime with a WhatsApp Web library
+     - local companion process
+     - protocol bridge compiled as a native module
+   - The Android app must communicate with the bridge through a local interface.
+   - Do not hardcode a fragile UI automation solution using Accessibility unless explicitly placed as experimental.
+   - Do not claim official support if using unofficial WhatsApp Web methods.
+5. The codebase must keep WhatsApp integration isolated so it can be replaced later.
+
+If the QR-based integration cannot be made reliable in pure Kotlin, create:
+- the Kotlin Android app fully
+- the WhatsAppClient interface
+- a mock WhatsApp client for local testing
+- clear TODO/integration instructions for the real QR bridge
+- tests proving the bot logic works independently from WhatsApp
+
+BOT COMMAND PARSING:
+Create BotCommandParser.
+
+Commands:
+- /help
+- /pesquisa query
+- /v number
+- /a number
+- /status
+- /cancel
+
+Rules:
+- Commands must be case-insensitive.
+- Accept extra spaces.
+- Validate bad inputs.
+- If user sends /pesquisa without query, reply with usage.
+- If user sends /v without number, reply with usage.
+- If user sends /v 99 and there are only 8 results, reply with an error.
+- If search session expired, ask user to search again.
+- If user sends unknown command, reply with a short help hint.
+
+Example /help response in Portuguese:
+
+🤖 Bot de YouTube
+
+Comandos:
+
+/pesquisa nome do vídeo
+Busca vídeos no YouTube.
+
+/v 1
+Baixa e envia o vídeo número 1 da última pesquisa.
+
+/a 1
+Baixa e envia o áudio número 1 da última pesquisa.
+
+/status
+Mostra o status do seu download.
+
+/cancel
+Cancela seu download atual.
+
+Exemplo:
+1. /pesquisa música relaxante
+2. /a 2
+
+SEARCH RESPONSE FORMAT:
+After /pesquisa minecraft 3ds, reply:
+
+🔎 Resultados para: minecraft 3ds
+
+1. Title here
+Canal: Channel name
+Duração: 08:32
+
+2. Title here
+Canal: Channel name
+Duração: 12:11
+
+...
+
+Para baixar:
+Vídeo: /v 1
+Áudio: /a 1
+
+JOB RESPONSE FLOW:
+When user requests /v 1:
+1. Reply:
+   ⏳ Baixando o vídeo: {title}
+   Vou enviar assim que estiver pronto.
+
+2. During long processing, optionally send progress updates but avoid spam.
+
+3. On success:
+   send media file.
+
+4. After successful media send:
+   delete local file.
+
+5. If failure:
+   send a clear error:
+   ❌ Não consegui baixar/enviar esse conteúdo.
+   Motivo: {safe error message}
+   Tente outro resultado ou use /a para baixar apenas o áudio.
+
+ANDROID UI REQUIREMENTS:
+Create screens:
+
+1. HomeScreen
+   - Status card
+   - Start Bot button
+   - Stop Bot button
+   - WhatsApp connection status
+   - Active downloads
+   - Last error
+   - QR code card if waiting for QR
+
+2. SettingsScreen
+   - Start on boot toggle
+   - Notifications enabled toggle
+   - Detailed notifications toggle
+   - Max concurrent downloads selector
+   - Video quality limit selector
+   - Audio format/bitrate selector
+   - Delete files after sending toggle
+   - Clear session button
+
+3. LogsScreen
+   - List logs
+   - Filter by level
+   - Clear logs button
+
+4. JobsScreen
+   - Active jobs
+   - Completed jobs
+   - Failed jobs
+   - Cancel job action
+
+UI design:
+- Use Material 3.
+- Use clean cards, rounded corners, clear typography.
+- Support dark mode.
+- Use professional status colors.
+- Avoid clutter.
+- Show empty states.
+- Show loading states.
+- Make it usable by a non-technical person.
+
+NOTIFICATION REQUIREMENTS:
+Create BotNotificationManager.
+
+Notification states:
+1. Running:
+   Title: Bot do WhatsApp rodando
+   Text: Conectado • 0 downloads ativos
+
+2. Waiting for QR:
+   Title: Conecte o WhatsApp
+   Text: Abra o app e escaneie o QR Code
+
+3. Error:
+   Title: Bot com problema
+   Text: {short error}
+
+4. Downloading:
+   Title: Bot do WhatsApp rodando
+   Text: {activeCount} download(s) em andamento
+
+Add notification actions:
+- Stop bot
+- Open app
+
+SERVICE REQUIREMENTS:
+Create BotForegroundService.
+
+Responsibilities:
+- Start foreground notification immediately.
+- Initialize dependencies.
+- Start WhatsApp client.
+- Observe incoming messages.
+- Parse commands.
+- Execute use cases.
+- Update notification.
+- Persist status.
+- Stop safely.
+- Release resources.
+
+Also create:
+- BootReceiver
+- NotificationActionReceiver if needed
+
+SECURITY REQUIREMENTS:
+- Do not store API keys directly in source code.
+- Use local.properties, BuildConfig, or encrypted settings.
+- Do not log sensitive tokens/session data.
+- Protect WhatsApp session data.
+- If storing session files, store them in app-private storage.
+- Add clear session action to delete session files.
+- Sanitize filenames.
+- Validate all external input.
+- Avoid path traversal.
+- Avoid memory leaks.
+
+ERROR HANDLING:
+Handle:
+- No internet
+- YouTube API quota exceeded
+- No search results
+- Invalid user command
+- Download failed
+- File too large
+- WhatsApp disconnected
+- QR expired
+- Permission denied
+- Battery optimization problems
+- Foreground service killed
+- Storage cleanup failure
+- Media send failure
+
+Every error should:
+- Be logged locally
+- Update job status if relevant
+- Update notification if serious
+- Send a user-friendly WhatsApp message when appropriate
+
+TESTING REQUIREMENTS:
+Add unit tests for:
+- Command parser
+- YouTube result filtering
+- Search session selection by chat
+- Queue behavior
+- Job state transitions
+- File cleanup logic
+- Error mapping
+
+Add fake implementations:
+- FakeWhatsAppClient
+- FakeYouTubeSearchClient
+- FakeMediaDownloader
+
+Use these fake implementations to test bot logic without real WhatsApp or YouTube.
+
+DELIVERABLES:
+Generate:
+1. Complete Gradle Android project.
+2. Kotlin source code.
+3. Jetpack Compose UI.
+4. Foreground service.
+5. Room database.
+6. Notification manager.
+7. Bot command parser.
+8. Queue manager.
+9. YouTube API client.
+10. Downloader abstraction.
+11. WhatsApp client abstraction.
+12. Mock WhatsApp client for testing.
+13. Real integration placeholder/adapter for WhatsApp with clear instructions.
+14. README.md with setup instructions.
+15. SECURITY.md explaining safe/legal use.
+16. TESTING.md explaining how to test.
+17. ARCHITECTURE.md explaining the design.
+18. Clear TODO list only for parts that cannot be implemented truthfully without external credentials or unofficial WhatsApp bridge.
+
+IMPLEMENTATION PLAN:
+Before coding, first create a short architecture decision document explaining:
+- Why Foreground Service is used.
+- How the bot runs 24/7 as reliably as Android allows.
+- How WhatsApp integration is isolated.
+- How concurrency is handled.
+- How search sessions are kept per chat.
+- How downloads are cleaned after sending.
+- How the app avoids mixing users.
+- Limitations of QR-based WhatsApp integration on Android.
+
+Then implement incrementally:
+Phase 1:
+- Project setup
+- Compose UI
+- Room database
+- Settings
+- Logs
+
+Phase 2:
+- Foreground service
+- Notification manager
+- Boot receiver
+- Battery optimization guidance
+
+Phase 3:
+- Bot command parser
+- Bot engine
+- Search session manager
+- Queue manager
+
+Phase 4:
+- YouTube API client
+- Result filtering
+- Tests
+
+Phase 5:
+- Downloader abstraction
+- Media conversion/compression flow
+- File cleanup
+
+Phase 6:
+- WhatsAppClient interface
+- FakeWhatsAppClient
+- Real adapter skeleton
+- QR state UI
+
+Phase 7:
+- End-to-end test using fake clients
+- Documentation
+- Final cleanup
+
+CODING STYLE:
+- Use idiomatic Kotlin.
+- Use coroutines and Flow.
+- Use sealed classes for states/results.
+- Use Result/Either-style error handling where useful.
+- Keep files small and organized.
+- Avoid giant classes.
+- Add meaningful comments only where helpful.
+- Do not over-engineer, but keep it professional.
+- Avoid blocking the main thread.
+- Make everything lifecycle-aware.
+- Make the bot engine independent from Android UI so it can be tested.
+
+IMPORTANT FINAL CHECK:
+After generating the code, review the entire project as a senior developer and verify:
+- No user state mixing between chats.
+- No files left behind after successful send.
+- App survives stop/start.
+- Bot can process multiple users asynchronously.
+- Invalid commands are handled.
+- Notification updates correctly.
+- QR state appears in UI.
+- Errors are shown in UI and notification.
+- Local database is used correctly.
+- Sensitive data is not logged.
+- README explains all setup steps.
+
+The final result must be a professional Kotlin Android app foundation capable of running this WhatsApp YouTube bot 24/7 as reliably as Android allows.
+
+
+INSTRUÇÃO EXTRA RECOMENDADA PARA O CODEX:
+
+Do not skip difficult parts. If any part is not realistically possible directly in pure Kotlin/Android, explain why and create the cleanest replaceable adapter/interface instead of pretending it works.
