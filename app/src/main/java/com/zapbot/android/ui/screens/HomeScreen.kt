@@ -46,7 +46,7 @@ fun HomeScreen(
             enter = fadeIn(tween(450)) + slideInVertically(tween(450)) { -it / 4 }
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Zap Bot", style = MaterialTheme.typography.headlineLarge)
+                Text("ZapTube Bot", style = MaterialTheme.typography.headlineLarge)
                 Text("WhatsApp automation console", style = MaterialTheme.typography.bodyMedium)
             }
         }

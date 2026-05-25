@@ -19,6 +19,7 @@ class YouTubeVideoResultTest {
         videoId = "id",
         url = "https://youtube.com/watch?v=id",
         durationSeconds = duration,
-        thumbnailUrl = null
+        thumbnailUrl = null,
+        publishedText = "01/01/2026"
     )
 }

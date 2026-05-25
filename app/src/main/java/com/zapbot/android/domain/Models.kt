@@ -8,7 +8,8 @@ data class YouTubeVideoResult(
     val videoId: String,
     val url: String,
     val durationSeconds: Long,
-    val thumbnailUrl: String?
+    val thumbnailUrl: String?,
+    val publishedText: String? = null
 ) {
     val durationText: String
         get() {

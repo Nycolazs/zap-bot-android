@@ -147,6 +147,7 @@ class BotEngine(
             val number = index + 1
             appendLine("*$number. ${video.title}*")
             appendLine("⏱️ _Duração:_ ${video.durationText}")
+            appendLine("🗓️ _Publicado:_ ${video.publishedText ?: "Não informado"}")
             appendLine("📺 _Canal:_ ${video.channel}")
             appendLine()
         }
@@ -167,7 +168,7 @@ class BotEngine(
     }
 
     private fun helpText() = """
-        🤖 *YouTube Bot*
+        🤖 *ZapTube Bot*
 
         *Como pesquisar*
         Envie */* junto com o que você quer buscar.
@@ -194,6 +195,7 @@ class BotEngine(
 
             *${video.title}*
             ⏱️ _Duração:_ ${video.durationText}
+            🗓️ _Publicado:_ ${video.publishedText ?: "Não informado"}
             📺 _Canal:_ ${video.channel}
 
             _Assim que estiver pronto, eu envio aqui no WhatsApp._

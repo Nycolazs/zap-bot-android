@@ -11,7 +11,8 @@ class FakeYouTubeSearchClient : YouTubeSearchClient {
                 videoId = "fake$it",
                 url = "https://youtube.com/watch?v=fake$it",
                 durationSeconds = 120L + it,
-                thumbnailUrl = null
+                thumbnailUrl = null,
+                publishedText = "01/01/2026"
             )
         }
 }

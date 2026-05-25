@@ -1,4 +1,4 @@
-# ZapBot WhatsApp Bridge
+# ZapTube Bot WhatsApp Bridge
 
 Bridge local nao-oficial usando Baileys para conectar um WhatsApp pessoal por codigo de pareamento.
 

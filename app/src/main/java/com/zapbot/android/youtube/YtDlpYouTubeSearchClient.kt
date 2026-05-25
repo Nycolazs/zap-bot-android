@@ -61,7 +61,9 @@ private data class YtDlpSearchResult(
     val uploader: String? = null,
     val channel: String? = null,
     @Json(name = "webpage_url") val webpageUrl: String? = null,
-    @Json(name = "thumbnail") val thumbnail: String? = null
+    @Json(name = "thumbnail") val thumbnail: String? = null,
+    @Json(name = "upload_date") val uploadDate: String? = null,
+    @Json(name = "release_date") val releaseDate: String? = null
 ) {
     fun toVideoResult(): YouTubeVideoResult? {
         val videoId = id?.takeIf { it.isNotBlank() } ?: return null
@@ -73,7 +75,13 @@ private data class YtDlpSearchResult(
             videoId = videoId,
             url = url,
             durationSeconds = duration?.toLong() ?: 0L,
-            thumbnailUrl = thumbnail
+            thumbnailUrl = thumbnail,
+            publishedText = formattedDate(releaseDate ?: uploadDate)
         )
+    }
+
+    private fun formattedDate(raw: String?): String? {
+        if (raw.isNullOrBlank() || raw.length != 8) return null
+        return "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}"
     }
 }

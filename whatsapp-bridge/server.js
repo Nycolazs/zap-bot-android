@@ -43,7 +43,7 @@ async function startSocket() {
     version,
     auth: auth.state,
     printQRInTerminal: false,
-    browser: ['ZapBot Android', 'Chrome', '1.0.0'],
+    browser: ['ZapTube Bot', 'Chrome', '1.1.0'],
     logger: pino({ level: 'silent' })
   })
 
@@ -178,5 +178,5 @@ app.post('/clear-session', async (_req, res) => {
 })
 
 app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`ZapBot WhatsApp bridge em http://0.0.0.0:${PORT}`)
+  logger.info(`ZapTube Bot WhatsApp bridge em http://0.0.0.0:${PORT}`)
 })

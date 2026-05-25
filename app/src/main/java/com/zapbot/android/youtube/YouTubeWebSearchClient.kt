@@ -67,6 +67,7 @@ class YouTubeWebSearchClient(moshi: Moshi) : YouTubeSearchClient {
             ?: textValue(this["longBylineText"])
             ?: textValue(this["shortBylineText"])
             ?: ""
+        val published = textValue(this["publishedTimeText"])
         val thumbnail = thumbnails(this["thumbnail"]).firstOrNull()
         return YouTubeVideoResult(
             title = cleanText(title),
@@ -74,7 +75,8 @@ class YouTubeWebSearchClient(moshi: Moshi) : YouTubeSearchClient {
             videoId = videoId,
             url = "https://www.youtube.com/watch?v=$videoId",
             durationSeconds = duration,
-            thumbnailUrl = thumbnail
+            thumbnailUrl = thumbnail,
+            publishedText = published?.let(::cleanText)
         )
     }
 

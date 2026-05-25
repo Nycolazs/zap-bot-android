@@ -32,7 +32,8 @@ class YouTubeApiClient(
                     videoId = item.id,
                     url = "https://youtube.com/watch?v=${item.id}",
                     durationSeconds = duration,
-                    thumbnailUrl = snippet.thumbnails?.medium?.url ?: snippet.thumbnails?.default?.url
+                    thumbnailUrl = snippet.thumbnails?.medium?.url ?: snippet.thumbnails?.default?.url,
+                    publishedText = snippet.publishedAt?.take(10)?.toBrazilianDate()
                 )
             }
             .take(maxResults)
@@ -79,6 +80,7 @@ data class VideoItem(
 data class VideoSnippet(
     val title: String? = null,
     val channelTitle: String? = null,
+    val publishedAt: String? = null,
     val liveBroadcastContent: String? = null,
     val thumbnails: Thumbnails? = null
 )
@@ -86,3 +88,9 @@ data class Thumbnails(@Json(name = "default") val default: Thumbnail? = null, va
 data class Thumbnail(val url: String? = null)
 data class ContentDetails(val duration: String? = null)
 data class VideoStatus(val privacyStatus: String? = null)
+
+private fun String.toBrazilianDate(): String? {
+    val parts = split("-")
+    if (parts.size != 3) return null
+    return "${parts[2]}/${parts[1]}/${parts[0]}"
+}

@@ -111,6 +111,7 @@ class DownloadQueueManager(
 
             *${request.video.title}*
             ⏱️ _Duração:_ ${request.video.durationText}
+            🗓️ _Publicado:_ ${request.video.publishedText ?: "Não informado"}
             📺 _Canal:_ ${request.video.channel}
         """.trimIndent()
     }

@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZapBotAndroid"
+rootProject.name = "ZapTube Bot"
 include(":app")
