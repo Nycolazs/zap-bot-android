@@ -119,6 +119,7 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
         "m4a" -> "audio/mp4"
         "mp3" -> "audio/mpeg"
         "ogg", "opus" -> "audio/ogg"
+        "zip" -> "application/zip"
         "jpg", "jpeg" -> "image/jpeg"
         "png" -> "image/png"
         else -> "application/octet-stream"

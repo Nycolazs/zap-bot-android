@@ -21,12 +21,24 @@ class BotCommandParser {
     private fun parseCompactDownloadOrSlashSearch(text: String, command: String): BotCommand {
         val normalized = command.lowercase()
         return when {
-            normalized == "/v" -> parseIndex(text.substringAfter(command, "").ifBlank { "1" }, true)
-            normalized == "/a" -> parseIndex(text.substringAfter(command, "").ifBlank { "1" }, false)
+            normalized == "/v" -> parseDownloadArgument(text.substringAfter(command, "").ifBlank { "1" }, true)
+            normalized == "/a" -> parseDownloadArgument(text.substringAfter(command, "").ifBlank { "1" }, false)
             normalized.matches(Regex("^/v\\d+$")) -> parseIndex(normalized.drop(2), true)
             normalized.matches(Regex("^/a\\d+$")) -> parseIndex(normalized.drop(2), false)
             else -> parseSlashSearch(text)
         }
+    }
+
+    private fun parseDownloadArgument(raw: String?, video: Boolean): BotCommand {
+        val argument = raw?.trim().orEmpty()
+        val link = YouTubeUrlParser.parse(argument)
+        if (link != null) {
+            return if (video) BotCommand.DownloadVideoLink(link.originalUrl) else BotCommand.DownloadAudioLink(link.originalUrl)
+        }
+        if (argument.startsWith("http://", ignoreCase = true) || argument.startsWith("https://", ignoreCase = true)) {
+            return BotCommand.Invalid("INVALID_YOUTUBE_LINK")
+        }
+        return parseIndex(argument, video)
     }
 
     private fun parseIndex(raw: String?, video: Boolean): BotCommand {

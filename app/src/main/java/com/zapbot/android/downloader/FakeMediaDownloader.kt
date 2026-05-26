@@ -10,6 +10,7 @@ import java.io.File
 class FakeMediaDownloader : MediaDownloader {
     override fun downloadVideo(jobId: Long, video: YouTubeVideoResult, outputDir: File, qualityLimit: String): Flow<DownloadProgress> = fake(outputDir, video, "mp4")
     override fun downloadAudio(jobId: Long, video: YouTubeVideoResult, outputDir: File, bitrate: String): Flow<DownloadProgress> = fake(outputDir, video, "m4a")
+    override fun downloadPlaylistAudioZip(jobId: Long, playlistUrl: String, outputDir: File, bitrate: String): Flow<DownloadProgress> = fake(outputDir, YouTubeVideoResult("Playlist", "YouTube", "playlist", playlistUrl, 0, null), "zip")
 
     private fun fake(outputDir: File, video: YouTubeVideoResult, extension: String) = flow {
         outputDir.mkdirs()
@@ -22,7 +23,11 @@ class FakeMediaDownloader : MediaDownloader {
 
     override suspend fun resultFile(outputDir: File): DownloadResult {
         val file = outputDir.listFiles()?.firstOrNull { it.isFile } ?: error("Output file not found")
-        val mime = if (file.extension == "mp4") "video/mp4" else "audio/mp4"
+        val mime = when (file.extension) {
+            "mp4" -> "video/mp4"
+            "zip" -> "application/zip"
+            else -> "audio/mp4"
+        }
         return DownloadResult(file, mime)
     }
 

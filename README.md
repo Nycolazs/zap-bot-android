@@ -35,8 +35,8 @@ Download the latest APK from GitHub Releases:
 
 Current app version:
 
-- `versionName`: `1.3.0`
-- `versionCode`: `4`
+- `versionName`: `1.4.0`
+- `versionCode`: `5`
 - `minSdk`: `26`
 - `targetSdk`: `35`
 
@@ -188,4 +188,3 @@ ZapTube Bot is an actively evolving Android bot app. The core workflow is implem
 - Persistent settings.
 - Logs and error filtering.
 - Multilingual UI and bot responses.
-

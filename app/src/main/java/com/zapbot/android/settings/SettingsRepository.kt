@@ -2,6 +2,7 @@ package com.zapbot.android.settings
 
 import com.zapbot.android.database.BotSettingsDao
 import com.zapbot.android.database.BotSettingsEntity
+import com.zapbot.android.domain.LanguageResolver
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,11 +23,12 @@ class SettingsRepository(private val dao: BotSettingsDao) {
         copy(
             deleteFilesAfterSending = true,
             maxConcurrentDownloads = maxConcurrentDownloads.coerceIn(1, 8),
-            appLanguage = appLanguage.takeIf { it in SUPPORTED_LANGUAGES } ?: "en",
-            botLanguage = botLanguage.takeIf { it in SUPPORTED_LANGUAGES } ?: "pt"
+            appLanguage = appLanguage.takeIf { it in LanguageResolver.supported } ?: LanguageResolver.SYSTEM,
+            botLanguage = botLanguage.takeIf { it in LanguageResolver.supported } ?: LanguageResolver.SYSTEM,
+            networkPreference = networkPreference.takeIf { it in NETWORK_PREFERENCES } ?: "WIFI_ONLY"
         )
 
     private companion object {
-        val SUPPORTED_LANGUAGES = setOf("en", "pt", "es", "ru")
+        val NETWORK_PREFERENCES = setOf("WIFI_ONLY", "ANY_NETWORK")
     }
 }

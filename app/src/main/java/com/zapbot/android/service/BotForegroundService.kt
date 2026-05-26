@@ -12,6 +12,7 @@ import com.zapbot.android.domain.BotCommandParser
 import com.zapbot.android.domain.BotEngine
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.network.NetworkTransport
 import com.zapbot.android.notifications.BotNotificationManager
 import com.zapbot.android.queue.DownloadQueueManager
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,7 @@ class BotForegroundService : Service() {
         .asCoroutineDispatcher()
     private lateinit var queue: DownloadQueueManager
     private var started = false
+    private var allowMobileNetworkForThisRun = false
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
@@ -46,6 +48,7 @@ class BotForegroundService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        allowMobileNetworkForThisRun = intent?.getBooleanExtra(EXTRA_ALLOW_MOBILE_NETWORK, false) == true
         startRuntime()
         return START_STICKY
     }
@@ -111,6 +114,20 @@ class BotForegroundService : Service() {
                 }
         }
         scope.launch(Dispatchers.IO) {
+            container.networkMonitor.transports().collect { transport ->
+                val settings = container.settings.get()
+                if (
+                    started &&
+                    !allowMobileNetworkForThisRun &&
+                    settings.networkPreference == "WIFI_ONLY" &&
+                    transport == NetworkTransport.MOBILE
+                ) {
+                    container.logger.warn("Service", "Bot stopped because network changed from Wi-Fi to mobile data while network preference is Wi-Fi only")
+                    stopSelf()
+                }
+            }
+        }
+        scope.launch(Dispatchers.IO) {
             var lastBatteryAlertAt = 0L
             while (true) {
                 val battery = getSystemService(BatteryManager::class.java)
@@ -145,11 +162,13 @@ class BotForegroundService : Service() {
     companion object {
         const val ACTION_START = "com.zapbot.android.START"
         const val ACTION_STOP = "com.zapbot.android.STOP"
+        const val EXTRA_ALLOW_MOBILE_NETWORK = "com.zapbot.android.ALLOW_MOBILE_NETWORK"
 
-        fun start(context: android.content.Context) {
+        fun start(context: android.content.Context, allowMobileNetwork: Boolean = false) {
             ContextCompat.startForegroundService(
                 context,
                 Intent(context, BotForegroundService::class.java).setAction(ACTION_START)
+                    .putExtra(EXTRA_ALLOW_MOBILE_NETWORK, allowMobileNetwork)
             )
         }
     }

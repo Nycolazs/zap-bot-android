@@ -33,13 +33,23 @@ class BotCommandParserTest {
     @Test fun parsesDownloadCommands() {
         assertEquals(BotCommand.DownloadVideo(2), parser.parse("/v 2"))
         assertEquals(BotCommand.DownloadVideo(2), parser.parse("/v2"))
+        assertEquals(BotCommand.DownloadVideo(1), parser.parse("/v"))
+        assertEquals(BotCommand.DownloadAudio(1), parser.parse("/a"))
         assertEquals(BotCommand.DownloadAudio(7), parser.parse("/A 7"))
         assertEquals(BotCommand.DownloadAudio(7), parser.parse("/a7"))
+    }
+
+    @Test fun parsesDirectYouTubeLinks() {
+        assertEquals(BotCommand.DownloadAudioLink("https://youtu.be/xVwF_JUM3xM?si=test"), parser.parse("/a https://youtu.be/xVwF_JUM3xM?si=test"))
+        assertEquals(BotCommand.DownloadVideoLink("https://www.youtube.com/watch?v=xVwF_JUM3xM"), parser.parse("/v https://www.youtube.com/watch?v=xVwF_JUM3xM"))
+        assertEquals(BotCommand.DownloadAudioLink("https://www.youtube.com/playlist?list=PL1234567890"), parser.parse("/a https://www.youtube.com/playlist?list=PL1234567890"))
+        assertEquals(BotCommand.DownloadVideoLink("https://www.youtube.com/playlist?list=PL1234567890"), parser.parse("/v https://www.youtube.com/playlist?list=PL1234567890"))
     }
 
     @Test fun rejectsBadIndex() {
         assertTrue(parser.parse("/v x") is BotCommand.Invalid)
         assertTrue(parser.parse("/a 0") is BotCommand.Invalid)
+        assertTrue(parser.parse("/a https://example.com/video") is BotCommand.Invalid)
     }
 
     @Test fun ignoresRegularMessages() {

@@ -33,6 +33,8 @@ class BotEngine(
             is BotCommand.Search -> search(message, command.query, text)
             is BotCommand.DownloadVideo -> enqueue(message, command.index, DownloadType.VIDEO, text)
             is BotCommand.DownloadAudio -> enqueue(message, command.index, DownloadType.AUDIO, text)
+            is BotCommand.DownloadVideoLink -> enqueueLink(message, command.url, DownloadType.VIDEO, text)
+            is BotCommand.DownloadAudioLink -> enqueueLink(message, command.url, DownloadType.AUDIO, text)
             BotCommand.Status -> status(message, text)
             BotCommand.Cancel -> cancel(message, text)
             is BotCommand.Invalid -> whatsapp.sendText(message.chatId, localizedInvalid(command.reason, text), message.id)
@@ -103,6 +105,42 @@ class BotEngine(
                 queue.enqueue(DownloadRequest(jobId, message.chatId, message.id, selected.video, type))
             }
         }
+    }
+
+    private suspend fun enqueueLink(message: IncomingWhatsAppMessage, url: String, type: DownloadType, text: BotMessages) {
+        val parsed = YouTubeUrlParser.parse(url)
+        if (parsed == null) {
+            whatsapp.sendText(message.chatId, text.invalidYouTubeLink(), message.id)
+            return
+        }
+        if (parsed.kind == YouTubeUrl.Kind.PLAYLIST && type == DownloadType.VIDEO) {
+            whatsapp.sendText(message.chatId, text.playlistVideoNotSupported(), message.id)
+            return
+        }
+
+        val isPlaylist = parsed.kind == YouTubeUrl.Kind.PLAYLIST
+        val title = if (isPlaylist) "YouTube playlist" else "YouTube link"
+        val video = YouTubeVideoResult(
+            title = title,
+            channel = "YouTube",
+            videoId = if (isPlaylist) "playlist" else url.substringAfterLast("/").substringBefore("?").take(32).ifBlank { "direct" },
+            url = url,
+            durationSeconds = 0,
+            thumbnailUrl = null
+        )
+        val jobId = jobDao.insert(
+            DownloadJobEntity(
+                chatId = message.chatId,
+                messageId = message.id,
+                youtubeVideoId = video.videoId,
+                title = title,
+                type = type,
+                status = DownloadStatus.QUEUED
+            )
+        )
+        whatsapp.sendText(message.chatId, text.downloadStarted(video, type), message.id)
+        alert("⬇️ *Download por link enfileirado*\n\n_Tipo:_ ${if (type == DownloadType.VIDEO) "Vídeo" else if (isPlaylist) "Playlist áudio" else "Áudio"}\n_Link:_ $url")
+        queue.enqueue(DownloadRequest(jobId, message.chatId, message.id, video, type, sourceUrl = url, isPlaylist = isPlaylist))
     }
 
     private suspend fun selectForDownload(message: IncomingWhatsAppMessage, index: Int): SelectionResult {
@@ -184,6 +222,7 @@ class BotEngine(
     }
 
     private fun localizedInvalid(reason: String, text: BotMessages): String = when {
+        reason == "INVALID_YOUTUBE_LINK" -> text.invalidYouTubeLink()
         reason.contains("/v1") -> text.invalidIndex(8)
         reason.contains("/a1") -> text.invalidIndex(8)
         else -> text.emptySearch()

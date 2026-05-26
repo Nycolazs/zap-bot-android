@@ -61,10 +61,10 @@ class DownloadQueueManager(
         val settings = settingsRepository.get()
         try {
             update(request.jobId, DownloadStatus.DOWNLOADING, 0)
-            val flow = if (request.type.name == "VIDEO") {
-                downloader.downloadVideo(request.jobId, request.video, outputDir, settings.videoQualityLimit)
-            } else {
-                downloader.downloadAudio(request.jobId, request.video, outputDir, settings.audioBitrate)
+            val flow = when {
+                request.isPlaylist -> downloader.downloadPlaylistAudioZip(request.jobId, request.sourceUrl, outputDir, settings.audioBitrate)
+                request.type == DownloadType.VIDEO -> downloader.downloadVideo(request.jobId, request.video, outputDir, settings.videoQualityLimit)
+                else -> downloader.downloadAudio(request.jobId, request.video, outputDir, settings.audioBitrate)
             }
             var lastProgress = -10
             flow.collectLatest { progress ->
@@ -114,8 +114,16 @@ class DownloadQueueManager(
             .take(180)
 
     private fun completedCaption(request: DownloadRequest): String {
-        val icon = if (request.type == DownloadType.VIDEO) "🎬" else "🎧"
-        val label = if (request.type == DownloadType.VIDEO) "Vídeo pronto" else "Áudio pronto"
+        val icon = when {
+            request.isPlaylist -> "🎵"
+            request.type == DownloadType.VIDEO -> "🎬"
+            else -> "🎧"
+        }
+        val label = when {
+            request.isPlaylist -> "Playlist pronta"
+            request.type == DownloadType.VIDEO -> "Vídeo pronto"
+            else -> "Áudio pronto"
+        }
         return """
             $icon *$label*
 
@@ -132,6 +140,12 @@ class DownloadQueueManager(
         }
         if (request.type == DownloadType.VIDEO && file.extension.lowercase() !in VIDEO_EXTENSIONS) {
             error("O downloader gerou um arquivo que não é vídeo compatível: .${file.extension}")
+        }
+        if (request.type == DownloadType.AUDIO && file.extension.lowercase() !in AUDIO_EXTENSIONS) {
+            error("O downloader gerou um arquivo de vídeo para um pedido de áudio: .${file.extension}")
+        }
+        if (request.isPlaylist && file.extension.lowercase() != "zip") {
+            error("A playlist deveria ser enviada como .zip, mas o arquivo gerado foi .${file.extension}")
         }
     }
 
@@ -154,5 +168,6 @@ class DownloadQueueManager(
         const val ALERT_GROUP_NAME = "Alerta Music Bot"
         const val MAX_WHATSAPP_VIDEO_BYTES = 1536L * 1024L * 1024L
         val VIDEO_EXTENSIONS = setOf("mp4", "webm")
+        val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "mp4a", "opus", "ogg", "zip")
     }
 }

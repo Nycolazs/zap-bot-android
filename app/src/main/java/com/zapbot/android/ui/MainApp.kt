@@ -38,7 +38,8 @@ fun MainApp(
     onShowErrorsOnlyChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onBattery: () -> Unit
+    onBattery: () -> Unit,
+    appVersion: String
 ) {
     val state by viewModel.state.collectAsState()
     val language = state.settings.appLanguage
@@ -48,7 +49,7 @@ fun MainApp(
         AppStrings.label(language, "logs"),
         AppStrings.label(language, "settings")
     )
-    val pagerState = rememberPagerState(initialPage = selectedPage, pageCount = { items.size })
+    val pagerState = rememberPagerState(initialPage = selectedPage.coerceIn(0, items.lastIndex), pageCount = { items.size })
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState.currentPage) {
@@ -113,7 +114,9 @@ fun MainApp(
                     onBattery,
                     viewModel::requestPairingCode,
                     state.lastPairingCode,
-                    state.pairingError
+                    state.pairingError,
+                    appVersion = appVersion,
+                    onCheckUpdates = viewModel::checkForUpdates
                 )
             }
         }

@@ -17,8 +17,9 @@ data class BotSettingsEntity(
     val audioBitrate: String = "128k",
     val deleteFilesAfterSending: Boolean = true,
     val themeMode: String = "system",
-    val appLanguage: String = "en",
-    val botLanguage: String = "pt",
+    val appLanguage: String = "system",
+    val botLanguage: String = "system",
+    val networkPreference: String = "WIFI_ONLY",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

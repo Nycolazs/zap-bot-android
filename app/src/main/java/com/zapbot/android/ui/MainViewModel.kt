@@ -9,6 +9,7 @@ import com.zapbot.android.database.BotSettingsEntity
 import com.zapbot.android.database.DownloadJobEntity
 import com.zapbot.android.domain.WhatsAppConnectionState
 import com.zapbot.android.service.BotRuntimeState
+import com.zapbot.android.updates.UpdateCheckResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -108,6 +109,11 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             }.getOrNull()
         }
     }
+
+    suspend fun checkForUpdates(language: String): String =
+        when (val result = container.updateChecker.check(language)) {
+            is UpdateCheckResult.NotConfigured -> result.message
+        }
 
     private fun uptimeText(startedAt: Long?, now: Long): String {
         if (startedAt == null) return "0s"

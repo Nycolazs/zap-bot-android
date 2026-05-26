@@ -33,6 +33,8 @@ sealed interface BotCommand {
     data class Search(val query: String) : BotCommand
     data class DownloadVideo(val index: Int) : BotCommand
     data class DownloadAudio(val index: Int) : BotCommand
+    data class DownloadVideoLink(val url: String) : BotCommand
+    data class DownloadAudioLink(val url: String) : BotCommand
     data object Status : BotCommand
     data object Cancel : BotCommand
     data class Invalid(val reason: String) : BotCommand
@@ -63,7 +65,9 @@ data class DownloadRequest(
     val chatId: String,
     val messageId: String,
     val video: YouTubeVideoResult,
-    val type: DownloadType
+    val type: DownloadType,
+    val sourceUrl: String = video.url,
+    val isPlaylist: Boolean = false
 )
 
 data class DownloadResult(

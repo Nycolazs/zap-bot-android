@@ -1,6 +1,8 @@
 package com.zapbot.android.domain
 
-class BotMessages(private val language: String) {
+class BotMessages(language: String) {
+    private val language = LanguageResolver.resolve(language)
+
     fun searching(query: String) = when (language) {
         "pt" -> "🔎 Buscando *$query*..."
         "es" -> "🔎 Buscando *$query*..."
@@ -23,6 +25,13 @@ class BotMessages(private val language: String) {
             🎬 Vídeo: */v1*
             🎧 Áudio: */a1*
 
+            *Links diretos*
+            🎧 */a https://youtu.be/exemplo* — baixa MP3
+            🎬 */v https://youtu.be/exemplo* — baixa vídeo
+            🎵 */a link-da-playlist* — envia os MP3 em um .zip
+
+            ⚠️ Playlists funcionam apenas com */a*.
+
             */status*
             Mostra o andamento do download atual.
 
@@ -42,6 +51,13 @@ class BotMessages(private val language: String) {
             *Cómo descargar*
             🎬 Video: */v1*
             🎧 Audio: */a1*
+
+            *Enlaces directos*
+            🎧 */a https://youtu.be/ejemplo* — descarga MP3
+            🎬 */v https://youtu.be/ejemplo* — descarga video
+            🎵 */a enlace-de-playlist* — envía los MP3 en un .zip
+
+            ⚠️ Las playlists solo funcionan con */a*.
 
             */status*
             Muestra el progreso de la descarga actual.
@@ -63,6 +79,13 @@ class BotMessages(private val language: String) {
             🎬 Видео: */v1*
             🎧 Аудио: */a1*
 
+            *Прямые ссылки*
+            🎧 */a https://youtu.be/example* — скачать MP3
+            🎬 */v https://youtu.be/example* — скачать видео
+            🎵 */a ссылка-на-плейлист* — отправить MP3 в .zip
+
+            ⚠️ Плейлисты работают только с */a*.
+
             */status*
             Показывает текущую загрузку.
 
@@ -82,6 +105,13 @@ class BotMessages(private val language: String) {
             *How to download*
             🎬 Video: */v1*
             🎧 Audio: */a1*
+
+            *Direct links*
+            🎧 */a https://youtu.be/example* — download MP3
+            🎬 */v https://youtu.be/example* — download video
+            🎵 */a playlist-link* — send MP3 files in a .zip
+
+            ⚠️ Playlists work only with */a*.
 
             */status*
             Shows the current download progress.
@@ -159,5 +189,19 @@ class BotMessages(private val language: String) {
         "es" -> "⚠️ *No pude completar el envío*\n\n_Motivo:_ $reason\n\nPuedes intentar otro resultado o descargar solo el audio con */a1*."
         "ru" -> "⚠️ *Не удалось завершить отправку*\n\n_Причина:_ $reason\n\nПопробуйте другой результат или скачайте только аудио через */a1*."
         else -> "⚠️ *I could not finish sending*\n\n_Reason:_ $reason\n\nTry another result or download audio only with */a1*."
+    }
+
+    fun invalidYouTubeLink() = when (language) {
+        "pt" -> "🔗 *Link inválido*\n\nUse um link de vídeo ou playlist do YouTube.\n\n_Exemplos:_\n*/a https://youtu.be/exemplo*\n*/v https://youtu.be/exemplo*"
+        "es" -> "🔗 *Enlace inválido*\n\nUsa un enlace de video o playlist de YouTube.\n\n_Ejemplos:_\n*/a https://youtu.be/ejemplo*\n*/v https://youtu.be/ejemplo*"
+        "ru" -> "🔗 *Неверная ссылка*\n\nИспользуйте ссылку на видео или плейлист YouTube.\n\n_Примеры:_\n*/a https://youtu.be/example*\n*/v https://youtu.be/example*"
+        else -> "🔗 *Invalid link*\n\nUse a YouTube video or playlist link.\n\n_Examples:_\n*/a https://youtu.be/example*\n*/v https://youtu.be/example*"
+    }
+
+    fun playlistVideoNotSupported() = when (language) {
+        "pt" -> "🎵 *Playlists são suportadas apenas para áudio.*\n\nUse */a* com o link da playlist para receber os MP3 em um arquivo .zip."
+        "es" -> "🎵 *Las playlists solo son compatibles con audio.*\n\nUsa */a* con el enlace de la playlist para recibir los MP3 en un archivo .zip."
+        "ru" -> "🎵 *Плейлисты поддерживаются только для аудио.*\n\nИспользуйте */a* со ссылкой на плейлист, чтобы получить MP3 в .zip."
+        else -> "🎵 *Playlists are supported for audio only.*\n\nUse */a* with the playlist link to receive the MP3 files in a .zip."
     }
 }

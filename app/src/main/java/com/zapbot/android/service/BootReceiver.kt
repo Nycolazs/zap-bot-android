@@ -15,7 +15,14 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val app = context.applicationContext as ZapBotApplication
-                if (app.container.settings.get().autoStartOnBoot) BotForegroundService.start(context)
+                val settings = app.container.settings.get()
+                if (settings.autoStartOnBoot) {
+                    if (settings.networkPreference == "ANY_NETWORK" || app.container.networkMonitor.isOnWifi()) {
+                        BotForegroundService.start(context)
+                    } else {
+                        app.container.logger.warn("BootReceiver", "Auto start skipped because network preference is Wi-Fi only and current network is not Wi-Fi")
+                    }
+                }
             } finally {
                 pending.finish()
             }

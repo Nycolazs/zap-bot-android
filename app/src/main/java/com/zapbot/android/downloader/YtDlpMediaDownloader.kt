@@ -15,6 +15,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
     private val initMutex = Mutex()
@@ -26,7 +30,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         clearOutput(outputDir)
         emit(DownloadProgress(0, "Preparando download"))
         val height = (qualityLimit.filter(Char::isDigit).toIntOrNull() ?: 360).coerceAtMost(SAFE_VIDEO_HEIGHT)
-        val request = baseRequest(video, outputDir).apply {
+        val request = baseRequest(video.url, outputDir).apply {
             addOption(
                 "-f",
                 "best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]+bestaudio[ext=m4a]/bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]"
@@ -44,13 +48,45 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         outputDir.mkdirs()
         clearOutput(outputDir)
         emit(DownloadProgress(0, "Preparando download"))
-        val request = baseRequest(video, outputDir).apply {
-            addOption("-f", "bestaudio/best")
+        val request = baseRequest(video.url, outputDir).apply {
+            addOption("-f", "bestaudio[acodec!=none][vcodec=none]/bestaudio[acodec!=none]/best[acodec!=none]")
+            addOption("--extract-audio")
+            addOption("--audio-format", "mp3")
+            addOption("--audio-quality", bitrate)
             addOption("-S", "+size")
         }
         emit(DownloadProgress(5, "Baixando áudio"))
         executeAndValidate(request, processId(jobId), outputDir)
         emit(DownloadProgress(100, "Áudio baixado"))
+    }
+
+    override fun downloadPlaylistAudioZip(jobId: Long, playlistUrl: String, outputDir: File, bitrate: String): Flow<DownloadProgress> = flow {
+        ensureInitialized()
+        outputDir.mkdirs()
+        clearOutput(outputDir)
+        val audioDir = File(outputDir, "playlist-audio").apply { mkdirs() }
+        emit(DownloadProgress(0, "Preparando playlist"))
+        val request = baseRequest(playlistUrl, audioDir, noPlaylist = false).apply {
+            addOption("--yes-playlist")
+            addOption("--ignore-errors")
+            addOption("--playlist-end", MAX_PLAYLIST_ITEMS.toString())
+            addOption("-f", "bestaudio[acodec!=none][vcodec=none]/bestaudio[acodec!=none]/best[acodec!=none]")
+            addOption("--extract-audio")
+            addOption("--audio-format", "mp3")
+            addOption("--audio-quality", bitrate)
+            addOption("-S", "+size")
+            addOption("-o", File(audioDir, "%(playlist_index)03d-%(title).80B.%(ext)s").absolutePath)
+        }
+        emit(DownloadProgress(5, "Baixando áudios da playlist"))
+        executeAndValidate(request, processId(jobId), audioDir)
+        val audioFiles = audioDir.listFiles()
+            ?.filter { it.isFile && it.length() > 0L && it.extension.lowercase() in AUDIO_EXTENSIONS }
+            ?.sortedBy { it.name }
+            .orEmpty()
+        if (audioFiles.isEmpty()) error("Nenhum áudio da playlist pôde ser baixado com sucesso")
+        emit(DownloadProgress(90, "Compactando playlist"))
+        zipFiles(audioFiles, File(outputDir, "playlist-audios.zip"))
+        emit(DownloadProgress(100, "Playlist pronta"))
     }
 
     override suspend fun resultFile(outputDir: File): DownloadResult = withContext(Dispatchers.IO) {
@@ -68,9 +104,9 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         YoutubeDL.getInstance().destroyProcessById(processId(jobId))
     }
 
-    private fun baseRequest(video: YouTubeVideoResult, outputDir: File): YoutubeDLRequest =
-        YoutubeDLRequest(video.url).apply {
-            addOption("--no-playlist")
+    private fun baseRequest(url: String, outputDir: File, noPlaylist: Boolean = true): YoutubeDLRequest =
+        YoutubeDLRequest(url).apply {
+            if (noPlaylist) addOption("--no-playlist")
             addOption("--newline")
             addOption("--no-mtime")
             addOption("--no-warnings")
@@ -84,6 +120,18 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             addOption("--restrict-filenames")
             addOption("-o", File(outputDir, "%(title).80B.%(ext)s").absolutePath)
         }
+
+    private suspend fun zipFiles(files: List<File>, zipFile: File) = withContext(Dispatchers.IO) {
+        ZipOutputStream(FileOutputStream(zipFile)).use { zip ->
+            files.forEach { file ->
+                FileInputStream(file).use { input ->
+                    zip.putNextEntry(ZipEntry(file.name))
+                    input.copyTo(zip)
+                    zip.closeEntry()
+                }
+            }
+        }
+    }
 
     private suspend fun executeAndValidate(request: YoutubeDLRequest, processId: String, outputDir: File) {
         try {
@@ -146,13 +194,16 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         "mp3" -> "audio/mpeg"
         "opus", "ogg" -> "audio/ogg"
         "webm" -> "video/webm"
+        "zip" -> "application/zip"
         else -> "application/octet-stream"
     }
 
     private companion object {
         const val SAFE_VIDEO_HEIGHT = 360
         const val SAFE_VIDEO_UPLOAD_BYTES = 1536L * 1024L * 1024L
-        val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm")
+        const val MAX_PLAYLIST_ITEMS = 50
+        val AUDIO_EXTENSIONS = setOf("m4a", "mp4a", "mp3", "opus", "ogg")
+        val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm", "zip")
         const val YOUTUBE_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36"
     }

@@ -12,12 +12,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.zapbot.android.service.BotForegroundService
+import com.zapbot.android.ui.AppStrings
 import com.zapbot.android.ui.MainApp
 import com.zapbot.android.ui.MainViewModel
 import com.zapbot.android.ui.theme.ZapBotTheme
@@ -31,21 +35,50 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val container = (application as ZapBotApplication).container
         if (Build.VERSION.SDK_INT >= 33) permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         setContent {
             val state by viewModel.state.collectAsState()
             var selectedPage by rememberSaveable { mutableStateOf(0) }
             var showErrorsOnly by rememberSaveable { mutableStateOf(false) }
+            var showMobileStartDialog by rememberSaveable { mutableStateOf(false) }
             Crossfade(targetState = state.settings.themeMode, animationSpec = tween(450), label = "themeMode") { themeMode ->
                 ZapBotTheme(themeMode = themeMode) {
+                    fun t(key: String) = AppStrings.label(state.settings.appLanguage, key)
+                    if (showMobileStartDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showMobileStartDialog = false },
+                            title = { Text(t("network_preference")) },
+                            text = { Text(t("mobile_start_warning")) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showMobileStartDialog = false
+                                    BotForegroundService.start(this, allowMobileNetwork = true)
+                                }) {
+                                    Text(t("start_anyway"))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showMobileStartDialog = false }) {
+                                    Text(t("cancel"))
+                                }
+                            }
+                        )
+                    }
                     MainApp(
                         viewModel = viewModel,
                         selectedPage = selectedPage,
                         onSelectedPageChange = { selectedPage = it },
                         showErrorsOnly = showErrorsOnly,
                         onShowErrorsOnlyChange = { showErrorsOnly = it },
-                        onStart = { BotForegroundService.start(this) },
+                        onStart = {
+                            if (state.settings.networkPreference == "WIFI_ONLY" && !container.networkMonitor.isOnWifi()) {
+                                showMobileStartDialog = true
+                            } else {
+                                BotForegroundService.start(this)
+                            }
+                        },
                         onStop = { startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP)) },
                         onBattery = {
                             runCatching {
@@ -53,7 +86,8 @@ class MainActivity : ComponentActivity() {
                             }.onFailure {
                                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
                             }
-                        }
+                        },
+                        appVersion = BuildConfig.VERSION_NAME
                     )
                 }
             }
