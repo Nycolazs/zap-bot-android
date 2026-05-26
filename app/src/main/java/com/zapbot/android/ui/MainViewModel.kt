@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.zapbot.android.AppContainer
+import com.zapbot.android.BuildConfig
 import com.zapbot.android.database.BotLogEntity
 import com.zapbot.android.database.BotSettingsEntity
 import com.zapbot.android.database.DownloadJobEntity
@@ -111,8 +112,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     suspend fun checkForUpdates(language: String): String =
-        when (val result = container.updateChecker.check(language)) {
-            is UpdateCheckResult.NotConfigured -> result.message
+        when (val result = container.updateChecker.check(language, BuildConfig.VERSION_NAME)) {
+            is UpdateCheckResult.Message -> result.message
         }
 
     private fun uptimeText(startedAt: Long?, now: Long): String {

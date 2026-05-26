@@ -35,8 +35,8 @@ Download the latest APK from GitHub Releases:
 
 Current app version:
 
-- `versionName`: `1.4.0`
-- `versionCode`: `5`
+- `versionName`: `1.4.1`
+- `versionCode`: `6`
 - `minSdk`: `26`
 - `targetSdk`: `35`
 

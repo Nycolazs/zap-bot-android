@@ -1,28 +1,18 @@
-# ZapTube Bot v1.4.0
+# ZapTube Bot v1.4.1
 
 ## What's New
 
-- App language now defaults to the Android system language.
-- Bot WhatsApp message language also defaults to the Android system language.
-- If the system language is not supported, both fall back to English.
-- Added the explicit "System language" option to language dropdowns.
-- Redesigned Settings with clearer sections and improved light/dark theme colors.
-- Added network preference controls, direct YouTube link downloads, playlist audio ZIP support, and the About card inside Settings.
+- Added GitHub release update checking from the About card.
+- When a newer APK is available, the app downloads it and opens the Android installer.
+- If Android blocks APK installs from this app, it opens the required permission screen.
+- The app is now locked to portrait orientation.
 
-## How to Install
+## Notes
 
-1. Download `ZapTube-Bot-v1.4.0.apk` from this release.
-2. Install it on the Android phone that will run the bot.
-3. Open `ZapTube Bot`.
-4. Go to `Settings` and pair WhatsApp as a linked device.
-5. Tap `Start bot`.
+Android does not allow a normal app to replace itself silently. The updater automates checking and downloading, then Android requires the user to confirm installation.
 
-## Main Commands
+## Previous v1.4.0 Highlights
 
-- `/help`: show help.
-- `/{search query}`: search YouTube.
-- `/v1`: send the video from result 1.
-- `/a1`: send the audio from result 1.
-- `/v <YouTube link>`: send video from a direct YouTube link.
-- `/a <YouTube link>`: send MP3 audio from a direct YouTube link.
-- `/a <YouTube playlist link>`: send playlist MP3 files in a ZIP.
+- App language and bot message language default to the Android system language.
+- Unsupported system languages fall back to English.
+- Redesigned Settings and improved light/dark theme colors.

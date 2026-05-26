@@ -1,19 +1,160 @@
 package com.zapbot.android.updates
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import com.zapbot.android.domain.LanguageResolver
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.io.File
 
-class UpdateChecker {
-    suspend fun check(language: String): UpdateCheckResult =
-        UpdateCheckResult.NotConfigured(
-            when (LanguageResolver.resolve(language)) {
-                "pt" -> "A verificação de atualizações ainda não está configurada."
-                "es" -> "La búsqueda de actualizaciones aún no está configurada."
-                "ru" -> "Проверка обновлений пока не настроена."
-                else -> "Update checking is not configured yet."
+class UpdateChecker(
+    private val context: Context,
+    private val client: OkHttpClient = OkHttpClient()
+) {
+    suspend fun check(language: String, currentVersion: String): UpdateCheckResult {
+        val lang = LanguageResolver.resolve(language)
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+                openInstallPermissionSettings()
+                return UpdateCheckResult.Message(message(lang, "permission"))
             }
-        )
+
+            val release = latestRelease() ?: return UpdateCheckResult.Message(message(lang, "unavailable"))
+            if (compareVersions(release.version, currentVersion) <= 0) {
+                return UpdateCheckResult.Message(message(lang, "up_to_date", release.version))
+            }
+
+            val apk = downloadApk(release)
+            openInstaller(apk)
+            UpdateCheckResult.Message(message(lang, "downloaded", release.version))
+        }.getOrElse {
+            UpdateCheckResult.Message(message(lang, "error", it.message ?: it.javaClass.simpleName))
+        }
+    }
+
+    private fun latestRelease(): ReleaseInfo? {
+        val request = Request.Builder()
+            .url(GITHUB_LATEST_RELEASE)
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "ZapTube-Bot-Android")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("GitHub returned HTTP ${response.code}")
+            val body = response.body?.string().orEmpty()
+            val json = JSONObject(body)
+            val tag = json.getString("tag_name")
+            val assets = json.getJSONArray("assets")
+            for (index in 0 until assets.length()) {
+                val asset = assets.getJSONObject(index)
+                val name = asset.getString("name")
+                if (name.endsWith(".apk", ignoreCase = true)) {
+                    return ReleaseInfo(
+                        version = tag.removePrefix("v"),
+                        tag = tag,
+                        apkName = name,
+                        apkUrl = asset.getString("browser_download_url")
+                    )
+                }
+            }
+        }
+        return null
+    }
+
+    private fun downloadApk(release: ReleaseInfo): File {
+        val outputDir = File(context.cacheDir, "updates").apply { mkdirs() }
+        outputDir.listFiles()?.forEach { it.deleteRecursively() }
+        val output = File(outputDir, release.apkName)
+        val request = Request.Builder()
+            .url(release.apkUrl)
+            .header("User-Agent", "ZapTube-Bot-Android")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("Download returned HTTP ${response.code}")
+            val body = response.body ?: error("Download body was empty")
+            output.outputStream().use { file ->
+                body.byteStream().use { input -> input.copyTo(file) }
+            }
+        }
+        if (output.length() <= 0L) error("Downloaded APK is empty")
+        return output
+    }
+
+    private fun openInstaller(apk: File) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(intent)
+    }
+
+    private fun openInstallPermissionSettings() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:${context.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
+    private fun compareVersions(latest: String, current: String): Int {
+        val left = latest.split('.', '-', '_').map { it.toIntOrNull() ?: 0 }
+        val right = current.split('.', '-', '_').map { it.toIntOrNull() ?: 0 }
+        val size = maxOf(left.size, right.size)
+        for (index in 0 until size) {
+            val diff = (left.getOrNull(index) ?: 0) - (right.getOrNull(index) ?: 0)
+            if (diff != 0) return diff
+        }
+        return 0
+    }
+
+    private fun message(language: String, key: String, value: String = ""): String = when (language) {
+        "pt" -> when (key) {
+            "permission" -> "Permita que o ZapTube Bot instale atualizações e toque em Verificar atualizações novamente."
+            "unavailable" -> "Não encontrei um APK disponível na última release do GitHub."
+            "up_to_date" -> "Você já está na versão mais recente ($value)."
+            "downloaded" -> "Atualização $value baixada. Confirme a instalação na tela do Android."
+            else -> "Não consegui verificar atualizações: $value"
+        }
+        "es" -> when (key) {
+            "permission" -> "Permite que ZapTube Bot instale actualizaciones y toca Buscar actualizaciones de nuevo."
+            "unavailable" -> "No encontré un APK disponible en la última release de GitHub."
+            "up_to_date" -> "Ya tienes la versión más reciente ($value)."
+            "downloaded" -> "Actualización $value descargada. Confirma la instalación en Android."
+            else -> "No pude buscar actualizaciones: $value"
+        }
+        "ru" -> when (key) {
+            "permission" -> "Разрешите ZapTube Bot устанавливать обновления и нажмите Проверить обновления снова."
+            "unavailable" -> "APK не найден в последнем релизе GitHub."
+            "up_to_date" -> "У вас уже последняя версия ($value)."
+            "downloaded" -> "Обновление $value загружено. Подтвердите установку в Android."
+            else -> "Не удалось проверить обновления: $value"
+        }
+        else -> when (key) {
+            "permission" -> "Allow ZapTube Bot to install updates, then tap Check for updates again."
+            "unavailable" -> "I could not find an APK in the latest GitHub release."
+            "up_to_date" -> "You are already on the latest version ($value)."
+            "downloaded" -> "Update $value downloaded. Confirm installation in Android."
+            else -> "Could not check for updates: $value"
+        }
+    }
+
+    private data class ReleaseInfo(
+        val version: String,
+        val tag: String,
+        val apkName: String,
+        val apkUrl: String
+    )
+
+    private companion object {
+        const val GITHUB_LATEST_RELEASE = "https://api.github.com/repos/Nycolazs/zap-bot-android/releases/latest"
+    }
 }
 
 sealed interface UpdateCheckResult {
-    data class NotConfigured(val message: String) : UpdateCheckResult
+    data class Message(val message: String) : UpdateCheckResult
 }

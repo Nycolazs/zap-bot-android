@@ -40,7 +40,7 @@ class AppContainer(app: Application) {
     val cleanup = FileCleanupManager(app.cacheDir)
     val notifications = BotNotificationManager(app)
     val networkMonitor = NetworkMonitor(app)
-    val updateChecker = UpdateChecker()
+    val updateChecker = UpdateChecker(app)
 
     val whatsappClient: WhatsAppClient = WhatsmeowWhatsAppClient(app)
     val youtubeClient: YouTubeSearchClient = YouTubeWebSearchClient(moshi)
