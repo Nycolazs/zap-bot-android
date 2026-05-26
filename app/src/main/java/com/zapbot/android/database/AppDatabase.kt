@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DownloadJobEntity::class,
         BotLogEntity::class
     ],
-    version = 6
+    version = 7
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +55,12 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("UPDATE bot_settings SET appLanguage = 'system' WHERE appLanguage = 'en'")
                 db.execSQL("UPDATE bot_settings SET botLanguage = 'system' WHERE botLanguage = 'pt'")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bot_settings ADD COLUMN blacklistedNumbers TEXT NOT NULL DEFAULT ''")
             }
         }
     }

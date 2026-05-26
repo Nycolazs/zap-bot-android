@@ -14,11 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -31,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -169,6 +174,18 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            HorizontalDivider()
+            Text(t("blacklist"), style = MaterialTheme.typography.titleSmall)
+            Text(
+                t("blacklist_desc"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            BlacklistEditor(
+                value = settings.blacklistedNumbers,
+                t = ::t,
+                onChange = { value -> onUpdate { it.copy(blacklistedNumbers = value) } }
+            )
         }
 
         SettingsSection(
@@ -276,6 +293,119 @@ fun SettingsScreen(
 }
 
 private const val PAIRING_CODE_COOLDOWN_SECONDS = 15
+
+@Composable
+private fun BlacklistEditor(
+    value: String,
+    t: (String) -> String,
+    onChange: (String) -> Unit
+) {
+    val numbers = remember(value) {
+        value.lineSequence()
+            .map { it.filter(Char::isDigit) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+    }
+    var draft by remember { mutableStateOf("") }
+
+    fun persist(next: List<String>) {
+        onChange(next.map { it.filter(Char::isDigit) }.filter { it.isNotBlank() }.distinct().joinToString("\n"))
+    }
+
+    fun addDraft() {
+        val normalized = draft.filter(Char::isDigit)
+        if (normalized.isBlank()) return
+        persist(numbers + normalized)
+        draft = ""
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it.filter(Char::isDigit) },
+                label = { Text(t("blocklist_new_number")) },
+                placeholder = { Text("5511999999999") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = ::addDraft,
+                enabled = draft.filter(Char::isDigit).isNotBlank()
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null)
+                Text(t("add_blocklist_number"), modifier = Modifier.padding(start = 6.dp))
+            }
+        }
+
+        if (numbers.isEmpty()) {
+            EmptyBlocklistState(t("blocklist_empty"))
+        } else {
+            Text(
+                t("blocklist_active_numbers"),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        numbers.forEach { number ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BlockedNumberItem(number = number, modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { persist(numbers - number) }
+                ) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = t("remove_blocklist_number"))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyBlocklistState(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.Block, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun BlockedNumberItem(number: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.Block, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(number, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+    }
+}
 
 @Composable
 private fun SettingsSection(

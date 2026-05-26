@@ -55,6 +55,7 @@ fun HomeScreen(
     state: DashboardState,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onConnectWhatsAppClick: () -> Unit,
     onFailedClick: () -> Unit
 ) {
     fun t(key: String) = AppStrings.label(state.settings.appLanguage, key)
@@ -83,7 +84,9 @@ fun HomeScreen(
         ) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onConnectWhatsAppClick)
             ) {
                 Text(
                     t("start_requires_whatsapp"),

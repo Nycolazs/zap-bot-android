@@ -135,6 +135,20 @@ class BotMessages(language: String) {
         else -> "⚠️ *I could not search right now*\n\n_Reason:_ $reason\n\nTry again shortly."
     }
 
+    fun missingSearchQuery() = when (language) {
+        "pt" -> "🔎 *Me diga o que você quer buscar*\n\n_Exemplo:_ */música relaxante*"
+        "es" -> "🔎 *Dime qué quieres buscar*\n\n_Ejemplo:_ */música relajante*"
+        "ru" -> "🔎 *Напишите, что нужно найти*\n\n_Пример:_ */relaxing music*"
+        else -> "🔎 *Tell me what you want to search for*\n\n_Example:_ */relaxing music*"
+    }
+
+    fun invalidDownloadCommand(type: DownloadType) = when (language) {
+        "pt" -> if (type == DownloadType.VIDEO) "🎬 *Para baixar um vídeo, use assim:*\n*/v1*" else "🎧 *Para baixar um áudio, use assim:*\n*/a1*"
+        "es" -> if (type == DownloadType.VIDEO) "🎬 *Para descargar un video, usa:*\n*/v1*" else "🎧 *Para descargar audio, usa:*\n*/a1*"
+        "ru" -> if (type == DownloadType.VIDEO) "🎬 *Чтобы скачать видео, используйте:*\n*/v1*" else "🎧 *Чтобы скачать аудио, используйте:*\n*/a1*"
+        else -> if (type == DownloadType.VIDEO) "🎬 *To download a video, use:*\n*/v1*" else "🎧 *To download audio, use:*\n*/a1*"
+    }
+
     fun expired(quoted: Boolean) = when (language) {
         "pt" -> if (quoted) "⌛ *Não encontrei a pesquisa dessa mensagem respondida*\n\nResponda diretamente a uma lista de resultados enviada pelo bot, ou faça uma nova busca." else "⌛ *Sua pesquisa expirou*\n\nEnvie uma nova busca começando com */*."
         "es" -> if (quoted) "⌛ *No encontré la búsqueda de ese mensaje respondido*\n\nResponde a una lista enviada por el bot o haz una nueva búsqueda." else "⌛ *Tu búsqueda expiró*\n\nEnvía una nueva búsqueda empezando con */*."
@@ -167,8 +181,13 @@ class BotMessages(language: String) {
         else -> "✅ *All clear*\n\nNo active downloads right now."
     }
 
-    fun statusActive(status: String, progress: Int, title: String) =
-        "📦 *Status*\n\n_${status}_ • *$progress%*\n$title"
+    fun statusActive(status: String, progress: Int, title: String): String {
+        val label = when (language) {
+            "ru" -> "Статус"
+            else -> "Status"
+        }
+        return "📦 *$label*\n\n_${status}_ • *$progress%*\n$title"
+    }
 
     fun searchResults(query: String, results: List<YouTubeVideoResult>): String = buildString {
         when (language) {

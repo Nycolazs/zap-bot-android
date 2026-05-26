@@ -27,7 +27,12 @@ class BotEngine(
     private val alertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun handle(message: IncomingWhatsAppMessage) {
-        val text = BotMessages(settings.get().botLanguage)
+        val currentSettings = settings.get()
+        if (message.isBlacklisted(currentSettings.blacklistedNumbers)) {
+            logger.info("BotEngine", "Ignored blacklisted sender ${message.senderLabel()}")
+            return
+        }
+        val text = BotMessages(currentSettings.botLanguage)
         when (val command = parser.parse(message.text)) {
             BotCommand.Help -> whatsapp.sendText(message.chatId, text.help(), message.id)
             is BotCommand.Search -> search(message, command.query, text)
@@ -201,9 +206,10 @@ class BotEngine(
     }
 
     private fun localizedInvalid(reason: String, text: BotMessages): String = when {
+        reason == "MISSING_SEARCH_QUERY" -> text.missingSearchQuery()
         reason == "INVALID_YOUTUBE_LINK" -> text.invalidYouTubeLink()
-        reason.contains("/v1") -> text.invalidIndex(8)
-        reason.contains("/a1") -> text.invalidIndex(8)
+        reason == "INVALID_VIDEO_INDEX" -> text.invalidDownloadCommand(DownloadType.VIDEO)
+        reason == "INVALID_AUDIO_INDEX" -> text.invalidDownloadCommand(DownloadType.AUDIO)
         else -> text.emptySearch()
     }
 
@@ -215,6 +221,15 @@ class BotEngine(
 
 private fun IncomingWhatsAppMessage.senderLabel(): String =
     senderName?.takeIf { it.isNotBlank() } ?: chatId.toReadableChatId()
+
+private fun IncomingWhatsAppMessage.isBlacklisted(rawBlacklist: String): Boolean {
+    val senderDigits = chatId.filter(Char::isDigit)
+    if (senderDigits.isBlank()) return false
+    return rawBlacklist.lineSequence()
+        .map { it.filter(Char::isDigit) }
+        .filter { it.isNotBlank() }
+        .any { blocked -> senderDigits == blocked || senderDigits.endsWith(blocked) || blocked.endsWith(senderDigits) }
+}
 
 private fun String.toReadableChatId(): String =
     substringBefore("@")

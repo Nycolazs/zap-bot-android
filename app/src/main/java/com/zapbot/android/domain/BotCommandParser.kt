@@ -11,7 +11,7 @@ class BotCommandParser {
             "/cancel" -> BotCommand.Cancel
             "/pesquisa", "/pesquisar", "/p", "/search" -> {
                 val query = parts.getOrNull(1)?.trim().orEmpty()
-                if (query.isBlank()) BotCommand.Invalid("🔎 *Me diga o que você quer buscar*\n\n_Exemplo:_ */música relaxante*")
+                if (query.isBlank()) BotCommand.Invalid("MISSING_SEARCH_QUERY")
                 else BotCommand.Search(query)
             }
             else -> parseCompactDownloadOrSlashSearch(text, parts.first())
@@ -44,7 +44,7 @@ class BotCommandParser {
     private fun parseIndex(raw: String?, video: Boolean): BotCommand {
         val index = raw?.trim()?.toIntOrNull()
         if (index == null || index < 1) {
-            return BotCommand.Invalid(if (video) "🎬 *Para baixar um vídeo, use assim:*\n*/v1*" else "🎧 *Para baixar um áudio, use assim:*\n*/a1*")
+            return BotCommand.Invalid(if (video) "INVALID_VIDEO_INDEX" else "INVALID_AUDIO_INDEX")
         }
         return if (video) BotCommand.DownloadVideo(index) else BotCommand.DownloadAudio(index)
     }

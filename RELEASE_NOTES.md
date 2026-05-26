@@ -1,6 +1,14 @@
-# ZapTube Bot v1.4.2
+# ZapTube Bot v1.4.3
 
 ## What's New
+
+- Added a WhatsApp Blocklist in Settings with a modern add/remove number interface.
+- Blocklisted numbers are ignored by the bot without disconnecting WhatsApp.
+- Fixed bottom navigation page syncing.
+- Improved dark mode system bar icon contrast.
+- Improved bot-message language handling for all listed languages.
+
+## Previous v1.4.2 Highlights
 
 - Blocked bot startup until WhatsApp has a saved linked-device session.
 - Auto-start on boot now skips startup when WhatsApp is not paired or connected.

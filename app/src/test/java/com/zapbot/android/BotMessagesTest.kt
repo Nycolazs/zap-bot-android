@@ -44,4 +44,27 @@ class BotMessagesTest {
     @Test fun englishStatusLabelUsesBotLanguage() {
         assertTrue(BotMessages("en").statusLabel(DownloadStatus.DOWNLOADING) == "Downloading")
     }
+
+    @Test fun listedLanguagesHaveBotMessageTranslations() {
+        val expected = mapOf(
+            "en" to listOf("Tell me what you want", "To download a video", "Video ready", "Downloading"),
+            "pt" to listOf("Me diga o que", "Para baixar um vídeo", "Vídeo pronto", "Baixando"),
+            "es" to listOf("Dime qué quieres", "Para descargar un video", "Video listo", "Descargando"),
+            "ru" to listOf("Напишите", "Чтобы скачать видео", "Видео готово", "Загрузка")
+        )
+
+        expected.forEach { (language, snippets) ->
+            val messages = BotMessages(language)
+            val combined = listOf(
+                messages.missingSearchQuery(),
+                messages.invalidDownloadCommand(DownloadType.VIDEO),
+                messages.completedCaption(video, DownloadType.VIDEO, isPlaylist = false),
+                messages.statusLabel(DownloadStatus.DOWNLOADING)
+            ).joinToString("\n")
+
+            snippets.forEach { snippet ->
+                assertTrue("$language should contain $snippet", combined.contains(snippet))
+            }
+        }
+    }
 }

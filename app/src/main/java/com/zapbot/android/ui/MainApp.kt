@@ -38,6 +38,7 @@ fun MainApp(
     onShowErrorsOnlyChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onOpenWhatsAppSettings: () -> Unit,
     onBattery: () -> Unit,
     appVersion: String
 ) {
@@ -52,8 +53,17 @@ fun MainApp(
     val pagerState = rememberPagerState(initialPage = selectedPage.coerceIn(0, items.lastIndex), pageCount = { items.size })
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(pagerState.currentPage) {
-        onSelectedPageChange(pagerState.currentPage)
+    LaunchedEffect(selectedPage) {
+        val targetPage = selectedPage.coerceIn(0, items.lastIndex)
+        if (targetPage != pagerState.currentPage) {
+            pagerState.scrollToPage(targetPage)
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (selectedPage != pagerState.settledPage) {
+            onSelectedPageChange(pagerState.settledPage)
+        }
     }
 
     fun openErrors() {
@@ -95,7 +105,14 @@ fun MainApp(
         val modifier = Modifier.padding(padding)
         HorizontalPager(state = pagerState, modifier = modifier) { page ->
             when (page) {
-                0 -> HomeScreen(Modifier, state, onStart, onStop, onFailedClick = ::openErrors)
+                0 -> HomeScreen(
+                    Modifier,
+                    state,
+                    onStart,
+                    onStop,
+                    onConnectWhatsAppClick = onOpenWhatsAppSettings,
+                    onFailedClick = ::openErrors
+                )
                 1 -> JobsScreen(Modifier, state.jobs, language = state.settings.appLanguage)
                 2 -> LogsScreen(
                     Modifier,

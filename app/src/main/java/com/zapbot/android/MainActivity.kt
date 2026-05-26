@@ -1,7 +1,9 @@
 package com.zapbot.android
 
 import android.Manifest
+import android.content.res.Configuration
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,9 +19,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.view.WindowCompat
 import com.zapbot.android.service.BotForegroundService
 import com.zapbot.android.ui.AppStrings
 import com.zapbot.android.ui.MainApp
@@ -46,6 +51,20 @@ class MainActivity : ComponentActivity() {
             var showWhatsAppRequiredDialog by rememberSaveable { mutableStateOf(false) }
             Crossfade(targetState = state.settings.themeMode, animationSpec = tween(450), label = "themeMode") { themeMode ->
                 ZapBotTheme(themeMode = themeMode) {
+                    val configuration = LocalConfiguration.current
+                    val darkSystemBars = when (themeMode) {
+                        "dark" -> true
+                        "light" -> false
+                        else -> configuration.isNightMode()
+                    }
+                    LaunchedEffect(darkSystemBars) {
+                        window.statusBarColor = Color.TRANSPARENT
+                        window.navigationBarColor = Color.TRANSPARENT
+                        WindowCompat.getInsetsController(window, window.decorView).apply {
+                            isAppearanceLightStatusBars = !darkSystemBars
+                            isAppearanceLightNavigationBars = !darkSystemBars
+                        }
+                    }
                     fun t(key: String) = AppStrings.label(state.settings.appLanguage, key)
                     if (showWhatsAppRequiredDialog) {
                         AlertDialog(
@@ -103,6 +122,9 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onStop = { startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP)) },
+                        onOpenWhatsAppSettings = {
+                            selectedPage = 3
+                        },
                         onBattery = {
                             runCatching {
                                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")))
@@ -117,3 +139,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private fun Configuration.isNightMode(): Boolean =
+    (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES

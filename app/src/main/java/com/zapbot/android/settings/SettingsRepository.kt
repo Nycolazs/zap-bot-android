@@ -25,8 +25,17 @@ class SettingsRepository(private val dao: BotSettingsDao) {
             maxConcurrentDownloads = maxConcurrentDownloads.coerceIn(1, 8),
             appLanguage = appLanguage.takeIf { it in LanguageResolver.supported } ?: LanguageResolver.SYSTEM,
             botLanguage = botLanguage.takeIf { it in LanguageResolver.supported } ?: LanguageResolver.SYSTEM,
-            networkPreference = networkPreference.takeIf { it in NETWORK_PREFERENCES } ?: "WIFI_ONLY"
+            networkPreference = networkPreference.takeIf { it in NETWORK_PREFERENCES } ?: "WIFI_ONLY",
+            blacklistedNumbers = normalizeBlacklistedNumbers(blacklistedNumbers)
         )
+
+    private fun normalizeBlacklistedNumbers(value: String): String =
+        value.lineSequence()
+            .flatMap { it.split(',', ';').asSequence() }
+            .map { it.filter(Char::isDigit) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString("\n")
 
     private companion object {
         val NETWORK_PREFERENCES = setOf("WIFI_ONLY", "ANY_NETWORK")
