@@ -7,6 +7,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.zapbot.android.domain.LanguageResolver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -20,17 +22,18 @@ class UpdateChecker(
         val lang = LanguageResolver.resolve(language)
         return runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                openInstallPermissionSettings()
+                withContext(Dispatchers.Main) { openInstallPermissionSettings() }
                 return UpdateCheckResult.Message(message(lang, "permission"))
             }
 
-            val release = latestRelease() ?: return UpdateCheckResult.Message(message(lang, "unavailable"))
+            val release = withContext(Dispatchers.IO) { latestRelease() }
+                ?: return UpdateCheckResult.Message(message(lang, "unavailable"))
             if (compareVersions(release.version, currentVersion) <= 0) {
                 return UpdateCheckResult.Message(message(lang, "up_to_date", release.version))
             }
 
-            val apk = downloadApk(release)
-            openInstaller(apk)
+            val apk = withContext(Dispatchers.IO) { downloadApk(release) }
+            withContext(Dispatchers.Main) { openInstaller(apk) }
             UpdateCheckResult.Message(message(lang, "downloaded", release.version))
         }.getOrElse {
             UpdateCheckResult.Message(message(lang, "error", it.message ?: it.javaClass.simpleName))

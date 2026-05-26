@@ -170,6 +170,48 @@ class BotMessages(language: String) {
     fun statusActive(status: String, progress: Int, title: String) =
         "📦 *Status*\n\n_${status}_ • *$progress%*\n$title"
 
+    fun searchResults(query: String, results: List<YouTubeVideoResult>): String = buildString {
+        when (language) {
+            "pt" -> {
+                appendLine("🔎 *Resultados encontrados*")
+                appendLine("_Pesquisa:_ $query")
+            }
+            "es" -> {
+                appendLine("🔎 *Resultados encontrados*")
+                appendLine("_Búsqueda:_ $query")
+            }
+            "ru" -> {
+                appendLine("🔎 *Результаты найдены*")
+                appendLine("_Поиск:_ $query")
+            }
+            else -> {
+                appendLine("🔎 *Results found*")
+                appendLine("_Search:_ $query")
+            }
+        }
+        appendLine()
+        results.forEachIndexed { index, video ->
+            val number = index + 1
+            appendLine("*$number. ${video.title}*")
+            appendLine("${durationLabel()} ${video.durationText}")
+            appendLine("${publishedLabel()} ${video.publishedText ?: notAvailable()}")
+            appendLine("${channelLabel()} ${video.channel}")
+            appendLine()
+        }
+        appendLine(downloadInstructionsTitle())
+        appendLine(videoInstruction())
+        appendLine(audioInstruction())
+        appendLine()
+        appendLine(replyTip())
+    }
+
+    fun searchQueryLinePrefixes(): List<String> = when (language) {
+        "pt" -> listOf("_Pesquisa:_")
+        "es" -> listOf("_Búsqueda:_", "_Busqueda:_")
+        "ru" -> listOf("_Поиск:_")
+        else -> listOf("_Search:_")
+    }
+
     fun cancelled() = when (language) {
         "pt" -> "🛑 *Download cancelado com sucesso.*"
         "es" -> "🛑 *Descarga cancelada.*"
@@ -203,5 +245,173 @@ class BotMessages(language: String) {
         "es" -> "🎵 *Las playlists solo son compatibles con audio.*\n\nUsa */a* con el enlace de la playlist para recibir los MP3 en un archivo .zip."
         "ru" -> "🎵 *Плейлисты поддерживаются только для аудио.*\n\nИспользуйте */a* со ссылкой на плейлист, чтобы получить MP3 в .zip."
         else -> "🎵 *Playlists are supported for audio only.*\n\nUse */a* with the playlist link to receive the MP3 files in a .zip."
+    }
+
+    fun completedCaption(video: YouTubeVideoResult, type: DownloadType, isPlaylist: Boolean): String {
+        val icon = when {
+            isPlaylist -> "🎵"
+            type == DownloadType.VIDEO -> "🎬"
+            else -> "🎧"
+        }
+        val label = when (language) {
+            "pt" -> when {
+                isPlaylist -> "Playlist pronta"
+                type == DownloadType.VIDEO -> "Vídeo pronto"
+                else -> "Áudio pronto"
+            }
+            "es" -> when {
+                isPlaylist -> "Playlist lista"
+                type == DownloadType.VIDEO -> "Video listo"
+                else -> "Audio listo"
+            }
+            "ru" -> when {
+                isPlaylist -> "Плейлист готов"
+                type == DownloadType.VIDEO -> "Видео готово"
+                else -> "Аудио готово"
+            }
+            else -> when {
+                isPlaylist -> "Playlist ready"
+                type == DownloadType.VIDEO -> "Video ready"
+                else -> "Audio ready"
+            }
+        }
+        return """
+            $icon *$label*
+
+            *${video.title}*
+            ${durationLabel()} ${video.durationText}
+            ${publishedLabel()} ${video.publishedText ?: notAvailable()}
+            ${channelLabel()} ${video.channel}
+        """.trimIndent()
+    }
+
+    fun statusLabel(status: DownloadStatus): String = when (language) {
+        "pt" -> when (status) {
+            DownloadStatus.QUEUED -> "Na fila"
+            DownloadStatus.DOWNLOADING -> "Baixando"
+            DownloadStatus.PROCESSING -> "Processando"
+            DownloadStatus.SENDING -> "Enviando"
+            DownloadStatus.COMPLETED -> "Concluído"
+            DownloadStatus.FAILED -> "Falhou"
+            DownloadStatus.CANCELLED -> "Cancelado"
+        }
+        "es" -> when (status) {
+            DownloadStatus.QUEUED -> "En cola"
+            DownloadStatus.DOWNLOADING -> "Descargando"
+            DownloadStatus.PROCESSING -> "Procesando"
+            DownloadStatus.SENDING -> "Enviando"
+            DownloadStatus.COMPLETED -> "Completado"
+            DownloadStatus.FAILED -> "Falló"
+            DownloadStatus.CANCELLED -> "Cancelado"
+        }
+        "ru" -> when (status) {
+            DownloadStatus.QUEUED -> "В очереди"
+            DownloadStatus.DOWNLOADING -> "Загрузка"
+            DownloadStatus.PROCESSING -> "Обработка"
+            DownloadStatus.SENDING -> "Отправка"
+            DownloadStatus.COMPLETED -> "Завершено"
+            DownloadStatus.FAILED -> "Ошибка"
+            DownloadStatus.CANCELLED -> "Отменено"
+        }
+        else -> when (status) {
+            DownloadStatus.QUEUED -> "Queued"
+            DownloadStatus.DOWNLOADING -> "Downloading"
+            DownloadStatus.PROCESSING -> "Processing"
+            DownloadStatus.SENDING -> "Sending"
+            DownloadStatus.COMPLETED -> "Completed"
+            DownloadStatus.FAILED -> "Failed"
+            DownloadStatus.CANCELLED -> "Cancelled"
+        }
+    }
+
+    fun videoTooLarge(actualSize: String, maxSize: String): String = when (language) {
+        "pt" -> "O vídeo ficou acima do limite de envio do bot ($actualSize). O limite atual é $maxSize."
+        "es" -> "El video superó el límite de envío del bot ($actualSize). El límite actual es $maxSize."
+        "ru" -> "Видео превышает лимит отправки бота ($actualSize). Текущий лимит: $maxSize."
+        else -> "The video is above the bot upload limit ($actualSize). Current limit is $maxSize."
+    }
+
+    fun incompatibleVideoFile(extension: String): String = when (language) {
+        "pt" -> "O downloader gerou um arquivo que não é vídeo compatível: .$extension"
+        "es" -> "El descargador generó un archivo que no es un video compatible: .$extension"
+        "ru" -> "Загрузчик создал несовместимый видеофайл: .$extension"
+        else -> "The downloader generated a file that is not a compatible video: .$extension"
+    }
+
+    fun incompatibleAudioFile(extension: String): String = when (language) {
+        "pt" -> "O downloader gerou um arquivo de vídeo para um pedido de áudio: .$extension"
+        "es" -> "El descargador generó un archivo de video para una solicitud de audio: .$extension"
+        "ru" -> "Загрузчик создал видеофайл для аудиозапроса: .$extension"
+        else -> "The downloader generated a video file for an audio request: .$extension"
+    }
+
+    fun incompatiblePlaylistFile(extension: String): String = when (language) {
+        "pt" -> "A playlist deveria ser enviada como .zip, mas o arquivo gerado foi .$extension"
+        "es" -> "La playlist debería enviarse como .zip, pero el archivo generado fue .$extension"
+        "ru" -> "Плейлист должен отправляться как .zip, но создан файл .$extension"
+        else -> "The playlist should be sent as .zip, but the generated file was .$extension"
+    }
+
+    fun downloaderEmptyFileFallback() = when (language) {
+        "pt" -> "o downloader não gerou um arquivo válido"
+        "es" -> "el descargador no generó un archivo válido"
+        "ru" -> "загрузчик не создал корректный файл"
+        else -> "the downloader did not generate a valid file"
+    }
+
+    private fun durationLabel() = when (language) {
+        "pt" -> "⏱️ _Duração:_"
+        "es" -> "⏱️ _Duración:_"
+        "ru" -> "⏱️ _Длительность:_"
+        else -> "⏱️ _Duration:_"
+    }
+
+    private fun publishedLabel() = when (language) {
+        "pt" -> "🗓️ _Publicado:_"
+        "es" -> "🗓️ _Publicado:_"
+        "ru" -> "🗓️ _Опубликовано:_"
+        else -> "🗓️ _Published:_"
+    }
+
+    private fun channelLabel() = when (language) {
+        "pt" -> "📺 _Canal:_"
+        "es" -> "📺 _Canal:_"
+        "ru" -> "📺 _Канал:_"
+        else -> "📺 _Channel:_"
+    }
+
+    private fun notAvailable() = when (language) {
+        "pt" -> "Não informado"
+        "es" -> "No informado"
+        "ru" -> "Не указано"
+        else -> "Not available"
+    }
+
+    private fun downloadInstructionsTitle() = when (language) {
+        "pt" -> "✨ *Como baixar*"
+        "es" -> "✨ *Cómo descargar*"
+        "ru" -> "✨ *Как скачать*"
+        else -> "✨ *How to download*"
+    }
+
+    private fun videoInstruction() = when (language) {
+        "pt" -> "🎬 Vídeo: envie */v1*, */v2*, */v3*..."
+        "es" -> "🎬 Video: envía */v1*, */v2*, */v3*..."
+        "ru" -> "🎬 Видео: отправьте */v1*, */v2*, */v3*..."
+        else -> "🎬 Video: send */v1*, */v2*, */v3*..."
+    }
+
+    private fun audioInstruction() = when (language) {
+        "pt" -> "🎧 Áudio: envie */a1*, */a2*, */a3*..."
+        "es" -> "🎧 Audio: envía */a1*, */a2*, */a3*..."
+        "ru" -> "🎧 Аудио: отправьте */a1*, */a2*, */a3*..."
+        else -> "🎧 Audio: send */a1*, */a2*, */a3*..."
+    }
+
+    private fun replyTip() = when (language) {
+        "pt" -> "_Dica:_ se você responder esta mensagem com */v1* ou */a1*, eu uso esta pesquisa, mesmo que exista uma pesquisa mais recente."
+        "es" -> "_Consejo:_ si respondes este mensaje con */v1* o */a1*, uso esta búsqueda aunque exista una más reciente."
+        "ru" -> "_Совет:_ если ответить на это сообщение командой */v1* или */a1*, я использую этот поиск, даже если есть более новый."
+        else -> "_Tip:_ if you reply to this message with */v1* or */a1*, I use this search even if there is a newer one."
     }
 }

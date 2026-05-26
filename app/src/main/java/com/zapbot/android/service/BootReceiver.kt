@@ -6,6 +6,7 @@ import android.content.Intent
 import com.zapbot.android.ZapBotApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
@@ -17,7 +18,10 @@ class BootReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as ZapBotApplication
                 val settings = app.container.settings.get()
                 if (settings.autoStartOnBoot) {
-                    if (settings.networkPreference == "ANY_NETWORK" || app.container.networkMonitor.isOnWifi()) {
+                    val hasWhatsAppSession = app.container.whatsappClient.hasSavedSession.first()
+                    if (!hasWhatsAppSession) {
+                        app.container.logger.warn("BootReceiver", "Auto start skipped because WhatsApp is not paired or connected")
+                    } else if (settings.networkPreference == "ANY_NETWORK" || app.container.networkMonitor.isOnWifi()) {
                         BotForegroundService.start(context)
                     } else {
                         app.container.logger.warn("BootReceiver", "Auto start skipped because network preference is Wi-Fi only and current network is not Wi-Fi")

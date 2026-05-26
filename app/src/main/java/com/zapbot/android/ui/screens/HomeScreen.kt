@@ -75,7 +75,24 @@ fun HomeScreen(
         AnimatedVisibility(visible = true, enter = fadeIn(tween(550))) {
             StatusHero(state, ::t)
         }
-        BotActionButton(state.connection, ::t, onStart, onStop)
+        BotActionButton(state, ::t, onStart, onStop)
+        AnimatedVisibility(
+            visible = !state.hasWhatsAppSession && state.connection !is WhatsAppConnectionState.Running,
+            enter = fadeIn() + slideInVertically { it / 3 },
+            exit = fadeOut()
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    t("start_requires_whatsapp"),
+                    modifier = Modifier.padding(14.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
         AnimatedVisibility(
             visible = state.connection is WhatsAppConnectionState.WaitingForQr,
             enter = fadeIn() + slideInVertically { it / 3 },
@@ -98,11 +115,12 @@ fun HomeScreen(
 
 @Composable
 private fun BotActionButton(
-    connection: WhatsAppConnectionState,
+    state: DashboardState,
     t: (String) -> String,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
+    val connection = state.connection
     val running = connection !is WhatsAppConnectionState.Disconnected && connection !is WhatsAppConnectionState.Error
     Crossfade(targetState = running, label = "botAction") { isRunning ->
         if (isRunning) {
@@ -123,6 +141,7 @@ private fun BotActionButton(
             )
             Button(
                 onClick = onStart,
+                enabled = state.hasWhatsAppSession,
                 modifier = Modifier
                     .fillMaxWidth()
                     .scale(pulse.value)

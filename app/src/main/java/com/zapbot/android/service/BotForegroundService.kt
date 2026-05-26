@@ -22,6 +22,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -55,8 +56,17 @@ class BotForegroundService : Service() {
 
     private fun startRuntime() {
         if (started) return
-        started = true
         val container = (application as ZapBotApplication).container
+        val hasWhatsAppSession = runBlocking(Dispatchers.IO) { container.whatsappClient.hasSavedSession.first() }
+        if (!hasWhatsAppSession) {
+            runBlocking(Dispatchers.IO) {
+                container.logger.warn("Service", "Bot start blocked because WhatsApp is not paired or connected")
+            }
+            stopSelf()
+            return
+        }
+
+        started = true
         BotRuntimeState.markStarted()
         startForeground(
             BotNotificationManager.NOTIFICATION_ID,

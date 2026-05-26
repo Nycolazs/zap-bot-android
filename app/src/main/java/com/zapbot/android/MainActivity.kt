@@ -43,9 +43,30 @@ class MainActivity : ComponentActivity() {
             var selectedPage by rememberSaveable { mutableStateOf(0) }
             var showErrorsOnly by rememberSaveable { mutableStateOf(false) }
             var showMobileStartDialog by rememberSaveable { mutableStateOf(false) }
+            var showWhatsAppRequiredDialog by rememberSaveable { mutableStateOf(false) }
             Crossfade(targetState = state.settings.themeMode, animationSpec = tween(450), label = "themeMode") { themeMode ->
                 ZapBotTheme(themeMode = themeMode) {
                     fun t(key: String) = AppStrings.label(state.settings.appLanguage, key)
+                    if (showWhatsAppRequiredDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showWhatsAppRequiredDialog = false },
+                            title = { Text(t("whatsapp_integration")) },
+                            text = { Text(t("start_requires_whatsapp")) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showWhatsAppRequiredDialog = false
+                                    selectedPage = 3
+                                }) {
+                                    Text(t("settings"))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showWhatsAppRequiredDialog = false }) {
+                                    Text(t("cancel"))
+                                }
+                            }
+                        )
+                    }
                     if (showMobileStartDialog) {
                         AlertDialog(
                             onDismissRequest = { showMobileStartDialog = false },
@@ -73,7 +94,9 @@ class MainActivity : ComponentActivity() {
                         showErrorsOnly = showErrorsOnly,
                         onShowErrorsOnlyChange = { showErrorsOnly = it },
                         onStart = {
-                            if (state.settings.networkPreference == "WIFI_ONLY" && !container.networkMonitor.isOnWifi()) {
+                            if (!state.hasWhatsAppSession) {
+                                showWhatsAppRequiredDialog = true
+                            } else if (state.settings.networkPreference == "WIFI_ONLY" && !container.networkMonitor.isOnWifi()) {
                                 showMobileStartDialog = true
                             } else {
                                 BotForegroundService.start(this)

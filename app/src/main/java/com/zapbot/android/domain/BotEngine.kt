@@ -57,7 +57,7 @@ class BotEngine(
                 )
                 return
             }
-            val sentMessageId = whatsapp.sendText(message.chatId, formatSearchResults(query, results), message.id)
+            val sentMessageId = whatsapp.sendText(message.chatId, text.searchResults(query, results), message.id)
             sessions.save(message.chatId, query, results, sentMessageId)
             alert("✅ *Pesquisa enviada*\n\n_Busca:_ $query\n_Resultados:_ ${results.size}")
             logger.info("BotEngine", "Search completed for ${message.senderLabel()}")
@@ -159,7 +159,7 @@ class BotEngine(
         val response = if (job == null) {
             text.statusIdle()
         } else {
-            text.statusActive(statusLabel(job.status), job.progress, job.title)
+            text.statusActive(text.statusLabel(job.status), job.progress, job.title)
         }
         whatsapp.sendText(message.chatId, response, message.id)
     }
@@ -174,42 +174,21 @@ class BotEngine(
         }
     }
 
-    private fun formatSearchResults(query: String, results: List<YouTubeVideoResult>): String = buildString {
-        appendLine("🔎 *Resultados encontrados*")
-        appendLine("_Pesquisa:_ $query")
-        appendLine()
-        results.forEachIndexed { index, video ->
-            val number = index + 1
-            appendLine("*$number. ${video.title}*")
-            appendLine("⏱️ _Duração:_ ${video.durationText}")
-            appendLine("🗓️ _Publicado:_ ${video.publishedText ?: "Não informado"}")
-            appendLine("📺 _Canal:_ ${video.channel}")
-            appendLine()
-        }
-        appendLine("✨ *Como baixar*")
-        appendLine("🎬 Vídeo: envie */v1*, */v2*, */v3*...")
-        appendLine("🎧 Áudio: envie */a1*, */a2*, */a3*...")
-        appendLine()
-        appendLine("_Dica:_ se você responder esta mensagem com */v1* ou */a1*, eu uso esta pesquisa, mesmo que exista uma pesquisa mais recente.")
-    }
-
     private fun quotedSearchQuery(text: String?): String? {
         if (text.isNullOrBlank()) return null
+        val prefixes = listOf(
+            "_Pesquisa:_",
+            "_Search:_",
+            "_Búsqueda:_",
+            "_Busqueda:_",
+            "_Поиск:_"
+        )
         return text.lineSequence()
-            .firstOrNull { it.startsWith("_Pesquisa:_") }
-            ?.substringAfter("_Pesquisa:_")
+            .firstNotNullOfOrNull { line ->
+                prefixes.firstOrNull { line.startsWith(it) }?.let { line.substringAfter(it) }
+            }
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-    }
-
-    private fun statusLabel(status: DownloadStatus): String = when (status) {
-        DownloadStatus.QUEUED -> "Na fila"
-        DownloadStatus.DOWNLOADING -> "Baixando"
-        DownloadStatus.PROCESSING -> "Processando"
-        DownloadStatus.SENDING -> "Enviando"
-        DownloadStatus.COMPLETED -> "Concluído"
-        DownloadStatus.FAILED -> "Falhou"
-        DownloadStatus.CANCELLED -> "Cancelado"
     }
 
     private fun safeError(t: Throwable): String =

@@ -59,6 +59,7 @@ class DownloadQueueManager(
     private suspend fun process(request: DownloadRequest) {
         val outputDir = cleanup.jobDir(request.jobId)
         val settings = settingsRepository.get()
+        val text = BotMessages(settings.botLanguage)
         try {
             update(request.jobId, DownloadStatus.DOWNLOADING, 0)
             val flow = when {
@@ -75,20 +76,19 @@ class DownloadQueueManager(
             }
             update(request.jobId, DownloadStatus.SENDING, 100)
             val result = downloader.resultFile(outputDir)
-            validateWhatsAppMedia(request, result.file)
-            whatsappClient.sendMedia(request.chatId, result.file, completedCaption(request), request.messageId)
+            validateWhatsAppMedia(request, result.file, text)
+            whatsappClient.sendMedia(request.chatId, result.file, text.completedCaption(request.video, request.type, request.isPlaylist), request.messageId)
             jobDao.finish(request.jobId, DownloadStatus.COMPLETED, null)
             alert("✅ *Envio concluído*\n\n_Título:_ ${request.video.title}\n_Tipo:_ ${request.type}\n_Tamanho:_ ${formatSize(result.file.length())}")
             if (settings.deleteFilesAfterSending) cleanup.cleanJob(request.jobId)
             logger.info("Queue", "Job ${request.jobId} completed")
         } catch (t: Throwable) {
             cleanup.cleanJob(request.jobId)
-            jobDao.finish(request.jobId, DownloadStatus.FAILED, safeError(t))
-            alert("🚨 *Erro no download/envio*\n\n_Título:_ ${request.video.title}\n_Motivo:_ ${safeError(t)}")
-            val text = BotMessages(settingsRepository.get().botLanguage)
+            jobDao.finish(request.jobId, DownloadStatus.FAILED, safeError(t, text))
+            alert("🚨 *Erro no download/envio*\n\n_Título:_ ${request.video.title}\n_Motivo:_ ${safeError(t, text)}")
             whatsappClient.sendText(
                 request.chatId,
-                text.sendFailed(safeError(t)),
+                text.sendFailed(safeError(t, text)),
                 request.messageId
             )
             logger.error("Queue", "Job ${request.jobId} failed", t)
@@ -100,7 +100,7 @@ class DownloadQueueManager(
         jobDao.update(current.copy(status = status, progress = progress, updatedAt = System.currentTimeMillis()))
     }
 
-    private fun safeError(t: Throwable): String =
+    private fun safeError(t: Throwable, text: BotMessages): String =
         (t.message ?: t.javaClass.simpleName)
             .lineSequence()
             .filterNot { it.contains("older than 90 days", ignoreCase = true) }
@@ -109,43 +109,22 @@ class DownloadQueueManager(
             .filterNot { it.contains("yt-dlp -U", ignoreCase = true) }
             .filterNot { it.startsWith("WARNING:", ignoreCase = true) }
             .joinToString(" ")
-            .ifBlank { "o downloader não gerou um arquivo válido" }
+            .ifBlank { text.downloaderEmptyFileFallback() }
             .replace(Regex("[\\r\\n]+"), " ")
             .take(180)
 
-    private fun completedCaption(request: DownloadRequest): String {
-        val icon = when {
-            request.isPlaylist -> "🎵"
-            request.type == DownloadType.VIDEO -> "🎬"
-            else -> "🎧"
-        }
-        val label = when {
-            request.isPlaylist -> "Playlist pronta"
-            request.type == DownloadType.VIDEO -> "Vídeo pronto"
-            else -> "Áudio pronto"
-        }
-        return """
-            $icon *$label*
-
-            *${request.video.title}*
-            ⏱️ _Duração:_ ${request.video.durationText}
-            🗓️ _Publicado:_ ${request.video.publishedText ?: "Não informado"}
-            📺 _Canal:_ ${request.video.channel}
-        """.trimIndent()
-    }
-
-    private fun validateWhatsAppMedia(request: DownloadRequest, file: java.io.File) {
+    private fun validateWhatsAppMedia(request: DownloadRequest, file: java.io.File, text: BotMessages) {
         if (request.type == DownloadType.VIDEO && file.length() > MAX_WHATSAPP_VIDEO_BYTES) {
-            error("O vídeo ficou acima do limite de envio do bot (${formatSize(file.length())}). O limite atual é ${formatSize(MAX_WHATSAPP_VIDEO_BYTES)}.")
+            error(text.videoTooLarge(formatSize(file.length()), formatSize(MAX_WHATSAPP_VIDEO_BYTES)))
         }
         if (request.type == DownloadType.VIDEO && file.extension.lowercase() !in VIDEO_EXTENSIONS) {
-            error("O downloader gerou um arquivo que não é vídeo compatível: .${file.extension}")
+            error(text.incompatibleVideoFile(file.extension))
         }
         if (request.type == DownloadType.AUDIO && file.extension.lowercase() !in AUDIO_EXTENSIONS) {
-            error("O downloader gerou um arquivo de vídeo para um pedido de áudio: .${file.extension}")
+            error(text.incompatibleAudioFile(file.extension))
         }
         if (request.isPlaylist && file.extension.lowercase() != "zip") {
-            error("A playlist deveria ser enviada como .zip, mas o arquivo gerado foi .${file.extension}")
+            error(text.incompatiblePlaylistFile(file.extension))
         }
     }
 

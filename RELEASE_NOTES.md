@@ -1,6 +1,13 @@
-# ZapTube Bot v1.4.1
+# ZapTube Bot v1.4.2
 
 ## What's New
+
+- Blocked bot startup until WhatsApp has a saved linked-device session.
+- Auto-start on boot now skips startup when WhatsApp is not paired or connected.
+- Fixed update checking/downloading so network work runs off the Android main thread.
+- Fixed bot-message language so search results, status labels, download captions, and user-facing errors follow the selected bot language.
+
+## Previous v1.4.1 Highlights
 
 - Added GitHub release update checking from the About card.
 - When a newer APK is available, the app downloads it and opens the Android installer.
