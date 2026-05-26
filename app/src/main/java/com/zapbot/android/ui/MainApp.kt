@@ -19,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,22 +32,32 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainApp(
     viewModel: MainViewModel,
+    selectedPage: Int,
+    onSelectedPageChange: (Int) -> Unit,
+    showErrorsOnly: Boolean,
+    onShowErrorsOnlyChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onBattery: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-    val items = listOf("Home", "Jobs", "Logs", "Settings")
-    val pagerState = rememberPagerState(pageCount = { items.size })
+    val language = state.settings.appLanguage
+    val items = listOf(
+        AppStrings.label(language, "home"),
+        AppStrings.label(language, "jobs"),
+        AppStrings.label(language, "logs"),
+        AppStrings.label(language, "settings")
+    )
+    val pagerState = rememberPagerState(initialPage = selectedPage, pageCount = { items.size })
     val scope = rememberCoroutineScope()
-    var showErrorsOnly by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage != 2) showErrorsOnly = false
+        onSelectedPageChange(pagerState.currentPage)
     }
 
     fun openErrors() {
-        showErrorsOnly = true
+        onShowErrorsOnlyChange(true)
+        onSelectedPageChange(2)
         scope.launch { pagerState.animateScrollToPage(2) }
     }
 
@@ -59,7 +68,10 @@ fun MainApp(
                     NavigationBarItem(
                         selected = pagerState.currentPage == index,
                         onClick = {
-                            if (index != 2) showErrorsOnly = false
+                            if (index == 2) {
+                                onShowErrorsOnlyChange(false)
+                            }
+                            onSelectedPageChange(index)
                             scope.launch { pagerState.animateScrollToPage(index) }
                         },
                         icon = {
@@ -83,8 +95,14 @@ fun MainApp(
         HorizontalPager(state = pagerState, modifier = modifier) { page ->
             when (page) {
                 0 -> HomeScreen(Modifier, state, onStart, onStop, onFailedClick = ::openErrors)
-                1 -> JobsScreen(Modifier, state.jobs)
-                2 -> LogsScreen(Modifier, state.logs, showErrorsOnly = showErrorsOnly, onClear = viewModel::clearLogs)
+                1 -> JobsScreen(Modifier, state.jobs, language = state.settings.appLanguage)
+                2 -> LogsScreen(
+                    Modifier,
+                    state.logs,
+                    language = state.settings.appLanguage,
+                    showErrorsOnly = showErrorsOnly,
+                    onClear = viewModel::clearLogs
+                )
                 3 -> SettingsScreen(
                     Modifier,
                     state.settings,

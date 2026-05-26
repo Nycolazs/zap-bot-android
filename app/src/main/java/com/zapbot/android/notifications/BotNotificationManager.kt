@@ -19,29 +19,43 @@ class BotNotificationManager(private val context: Context) {
     init {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "WhatsApp Bot", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CHANNEL_ID, "ZapTube Bot", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "Bot runtime status and active downloads"
+                }
             )
         }
     }
 
-    fun build(state: WhatsAppConnectionState, activeDownloads: Int, lastError: String? = null): Notification {
+    fun build(
+        state: WhatsAppConnectionState,
+        activeDownloads: Int,
+        startedAt: Long? = null,
+        themeMode: String = "system",
+        lastError: String? = null
+    ): Notification {
         val (title, text) = when {
-            state is WhatsAppConnectionState.WaitingForQr -> "Connect WhatsApp" to "Open the app and scan the QR code"
-            state is WhatsAppConnectionState.Error -> "Bot issue" to state.message.take(120)
-            lastError != null -> "Bot issue" to lastError.take(120)
-            activeDownloads > 0 -> "WhatsApp bot running" to "$activeDownloads active download(s)"
-            else -> "WhatsApp bot running" to "${label(state)} - 0 active downloads"
+            state is WhatsAppConnectionState.WaitingForQr -> "ZapTube Bot" to "Connect WhatsApp"
+            state is WhatsAppConnectionState.Error -> "ZapTube Bot" to "Needs attention"
+            lastError != null -> "ZapTube Bot" to "Needs attention"
+            activeDownloads > 0 -> "ZapTube Bot" to "$activeDownloads active"
+            else -> "ZapTube Bot" to label(state)
         }
 
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(notificationColor(themeMode))
+            .setColorized(false)
             .setContentTitle(title)
             .setContentText(text)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setShowWhen(startedAt != null)
+            .setWhen(startedAt ?: System.currentTimeMillis())
+            .setUsesChronometer(startedAt != null)
             .setContentIntent(openAppIntent())
-            .addAction(0, "Stop bot", serviceIntent(BotForegroundService.ACTION_STOP))
-            .addAction(0, "Open app", openAppIntent())
+            .addAction(0, "Stop", serviceIntent(BotForegroundService.ACTION_STOP))
             .build()
     }
 
@@ -56,6 +70,16 @@ class BotNotificationManager(private val context: Context) {
         is WhatsAppConnectionState.Connected -> "Connected"
         WhatsAppConnectionState.Running -> "Running"
         is WhatsAppConnectionState.Error -> "Error"
+    }
+
+    private fun notificationColor(themeMode: String): Int = when (themeMode) {
+        "dark" -> 0xFF7ADBCB.toInt()
+        "light" -> 0xFF126C5E.toInt()
+        else -> if ((context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES) {
+            0xFF7ADBCB.toInt()
+        } else {
+            0xFF126C5E.toInt()
+        }
     }
 
     private fun openAppIntent(): PendingIntent =

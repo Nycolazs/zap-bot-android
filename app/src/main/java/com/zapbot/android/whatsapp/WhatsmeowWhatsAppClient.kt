@@ -4,7 +4,7 @@ import android.app.Application
 import android.database.sqlite.SQLiteDatabase
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,8 +13,14 @@ import whatsmeowbridge.Bridge
 import whatsmeowbridge.Listener
 import whatsmeowbridge.Whatsmeowbridge
 import java.io.File
+import java.util.concurrent.Executors
 
 class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
+    private val bridgeDispatcher = Executors.newFixedThreadPool(4) { runnable ->
+        Thread(runnable, "zapbot-whatsapp").apply {
+            priority = Thread.MAX_PRIORITY
+        }
+    }.asCoroutineDispatcher()
     private val storeDir = File(app.filesDir, "whatsmeow")
     private val storeDb = File(storeDir, "whatsmeow.db")
     private val state = MutableStateFlow<WhatsAppConnectionState>(WhatsAppConnectionState.Disconnected)
@@ -58,27 +64,27 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
     override val hasSavedSession: Flow<Boolean> = savedSession
     override val incomingMessages: Flow<IncomingWhatsAppMessage> = messages
 
-    override suspend fun start() = withContext(Dispatchers.IO) {
+    override suspend fun start() = withContext(bridgeDispatcher) {
         refreshSavedSession()
         state.value = WhatsAppConnectionState.Connecting
         bridge.start()
         refreshSavedSession()
     }
 
-    override suspend fun stop() = withContext(Dispatchers.IO) {
+    override suspend fun stop() = withContext(bridgeDispatcher) {
         bridge.stop()
         state.value = WhatsAppConnectionState.Disconnected
         refreshSavedSession()
     }
 
-    override suspend fun clearSession() = withContext(Dispatchers.IO) {
+    override suspend fun clearSession() = withContext(bridgeDispatcher) {
         bridge.clearSession()
         lastPairingCode.value = null
         savedSession.value = false
         state.value = WhatsAppConnectionState.Disconnected
     }
 
-    override suspend fun requestPairingCode(phoneNumberE164: String): String = withContext(Dispatchers.IO) {
+    override suspend fun requestPairingCode(phoneNumberE164: String): String = withContext(bridgeDispatcher) {
         refreshSavedSession()
         state.value = WhatsAppConnectionState.Connecting
         val code = bridge.pairPhone(phoneNumberE164)
@@ -87,15 +93,15 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
         code
     }
 
-    override suspend fun sendText(chatId: String, text: String, replyToMessageId: String?): String? = withContext(Dispatchers.IO) {
+    override suspend fun sendText(chatId: String, text: String, replyToMessageId: String?): String? = withContext(bridgeDispatcher) {
         bridge.sendText(chatId, text)
     }
 
-    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = withContext(Dispatchers.IO) {
+    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = withContext(bridgeDispatcher) {
         bridge.sendTextToGroupName(groupName, text)
     }
 
-    override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) = withContext(Dispatchers.IO) {
+    override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) = withContext(bridgeDispatcher) {
         bridge.sendMedia(chatId, file.absolutePath, caption.orEmpty(), mimeType(file))
     }
 

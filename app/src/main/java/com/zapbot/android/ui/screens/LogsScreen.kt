@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zapbot.android.database.BotLogEntity
 import com.zapbot.android.domain.LogLevel
+import com.zapbot.android.ui.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -36,15 +37,18 @@ import java.util.Locale
 fun LogsScreen(
     modifier: Modifier,
     logs: List<BotLogEntity>,
+    language: String = "en",
     showErrorsOnly: Boolean = false,
     onClear: () -> Unit
 ) {
+    fun t(key: String) = AppStrings.label(language, key)
     val context = LocalContext.current
     val visibleLogs = remember(logs, showErrorsOnly) {
+        val botLogs = logs.filter { it.tag in BOT_LOG_TAGS && !it.message.contains("Message handled", ignoreCase = true) }
         if (showErrorsOnly) {
-            logs.filter { it.level == LogLevel.ERROR || it.level == LogLevel.WARN }
+            botLogs.filter { it.level == LogLevel.ERROR }
         } else {
-            logs
+            botLogs
         }
     }
     var formattedMessages by remember(visibleLogs) { mutableStateOf<Map<Long, String>>(emptyMap()) }
@@ -58,15 +62,15 @@ fun LogsScreen(
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text(if (showErrorsOnly) "Recent errors" else "Logs", style = MaterialTheme.typography.headlineSmall)
+                Text(if (showErrorsOnly) t("errors") else t("logs"), style = MaterialTheme.typography.headlineSmall)
                 if (showErrorsOnly) {
-                    Text("Warnings and failures from the bot", style = MaterialTheme.typography.bodySmall)
+                    Text("ERROR", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            Button(onClick = onClear) { Text("Clear") }
+            Button(onClick = onClear) { Text(t("clear")) }
         }
         if (visibleLogs.isEmpty()) {
-            Text(if (showErrorsOnly) "No recent errors." else "No logs yet.")
+            Text(if (showErrorsOnly) t("no_errors") else t("no_logs"))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(visibleLogs, key = { it.id }) { log ->
@@ -111,3 +115,4 @@ private fun phoneDisplay(phone: String): String = if (phone.startsWith("+")) pho
 
 private val PHONE_JID_REGEX = Regex("""\b(\+?\d{8,20})@(s\.whatsapp\.net|c\.us)\b""")
 private val LID_REGEX = Regex("""\b[A-Za-z0-9._-]+@lid\b""")
+private val BOT_LOG_TAGS = setOf("BotEngine", "Queue", "Service")

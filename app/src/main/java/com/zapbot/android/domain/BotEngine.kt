@@ -6,6 +6,7 @@ import com.zapbot.android.database.DownloadJobDao
 import com.zapbot.android.database.DownloadJobEntity
 import com.zapbot.android.logging.BotLogger
 import com.zapbot.android.queue.DownloadQueueManager
+import com.zapbot.android.settings.SettingsRepository
 import com.zapbot.android.whatsapp.WhatsAppClient
 import com.zapbot.android.youtube.YouTubeSearchClient
 import kotlinx.coroutines.CoroutineScope
@@ -20,31 +21,36 @@ class BotEngine(
     private val jobDao: DownloadJobDao,
     private val queue: DownloadQueueManager,
     private val whatsapp: WhatsAppClient,
+    private val settings: SettingsRepository,
     private val logger: BotLogger
 ) {
     private val alertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun handle(message: IncomingWhatsAppMessage) {
+        val text = BotMessages(settings.get().botLanguage)
         when (val command = parser.parse(message.text)) {
-            BotCommand.Help -> whatsapp.sendText(message.chatId, helpText(), message.id)
-            is BotCommand.Search -> search(message, command.query)
-            is BotCommand.DownloadVideo -> enqueue(message, command.index, DownloadType.VIDEO)
-            is BotCommand.DownloadAudio -> enqueue(message, command.index, DownloadType.AUDIO)
-            BotCommand.Status -> status(message)
-            BotCommand.Cancel -> cancel(message)
-            is BotCommand.Invalid -> whatsapp.sendText(message.chatId, command.reason, message.id)
+            BotCommand.Help -> whatsapp.sendText(message.chatId, text.help(), message.id)
+            is BotCommand.Search -> search(message, command.query, text)
+            is BotCommand.DownloadVideo -> enqueue(message, command.index, DownloadType.VIDEO, text)
+            is BotCommand.DownloadAudio -> enqueue(message, command.index, DownloadType.AUDIO, text)
+            BotCommand.Status -> status(message, text)
+            BotCommand.Cancel -> cancel(message, text)
+            is BotCommand.Invalid -> whatsapp.sendText(message.chatId, localizedInvalid(command.reason, text), message.id)
             BotCommand.Unknown -> Unit
         }
     }
 
-    private suspend fun search(message: IncomingWhatsAppMessage, query: String) {
+    private suspend fun search(message: IncomingWhatsAppMessage, query: String, text: BotMessages) {
         try {
+            runCatching {
+                whatsapp.sendText(message.chatId, text.searching(query), message.id)
+            }
             alert("🔎 *Pesquisa recebida*\n\n_Chat:_ ${message.chatId}\n_Busca:_ $query")
             val results = youtube.searchVideos(query, SEARCH_RESULT_LIMIT)
             if (results.isEmpty()) {
                 whatsapp.sendText(
                     message.chatId,
-                    "🔎 *Não encontrei resultados disponíveis*\n\nTente uma busca mais específica, por exemplo:\n_/abertura pokemon_",
+                    text.emptySearch(),
                     message.id
                 )
                 return
@@ -58,27 +64,23 @@ class BotEngine(
             alert("🚨 *Erro na pesquisa*\n\n_Busca:_ $query\n_Motivo:_ ${safeError(t)}")
             whatsapp.sendText(
                 message.chatId,
-                "⚠️ *Não consegui pesquisar agora*\n\n_Motivo:_ ${safeError(t)}\n\nTente novamente em instantes.",
+                text.searchFailed(safeError(t)),
                 message.id
             )
         }
     }
 
-    private suspend fun enqueue(message: IncomingWhatsAppMessage, index: Int, type: DownloadType) {
+    private suspend fun enqueue(message: IncomingWhatsAppMessage, index: Int, type: DownloadType, text: BotMessages) {
         val selected = selectForDownload(message, index)
         when (selected) {
             SelectionResult.Expired -> whatsapp.sendText(
                 message.chatId,
-                if (message.quotedMessageId.isNullOrBlank()) {
-                    "⌛ *Sua pesquisa expirou*\n\nEnvie uma nova busca começando com */*.\n\n_Exemplo:_ */música relaxante*"
-                } else {
-                    "⌛ *Não encontrei a pesquisa dessa mensagem respondida*\n\nResponda diretamente a uma lista de resultados enviada pelo bot, ou faça uma nova busca."
-                },
+                text.expired(!message.quotedMessageId.isNullOrBlank()),
                 message.id
             )
             is SelectionResult.InvalidIndex -> whatsapp.sendText(
                 message.chatId,
-                "🔢 *Resultado inválido*\n\nEscolha um número entre *1* e *${selected.available}*.\n\n_Exemplo:_ */v1* ou */a1*",
+                text.invalidIndex(selected.available),
                 message.id
             )
             is SelectionResult.Selected -> {
@@ -94,7 +96,7 @@ class BotEngine(
                 )
                 whatsapp.sendText(
                     message.chatId,
-                    downloadStartedText(selected.video, type),
+                    text.downloadStarted(selected.video, type),
                     message.id
                 )
                 alert("⬇️ *Download enfileirado*\n\n_Tipo:_ ${if (type == DownloadType.VIDEO) "Vídeo" else "Áudio"}\n_Título:_ ${selected.video.title}\n_Canal:_ ${selected.video.channel}")
@@ -114,28 +116,23 @@ class BotEngine(
         return sessions.select(message.chatId, index, message.quotedMessageId)
     }
 
-    private suspend fun status(message: IncomingWhatsAppMessage) {
+    private suspend fun status(message: IncomingWhatsAppMessage, text: BotMessages) {
         val job = jobDao.activeForChat(message.chatId)
-        val text = if (job == null) {
-            "✅ *Tudo livre por aqui*\n\nNenhum download em andamento no momento."
+        val response = if (job == null) {
+            text.statusIdle()
         } else {
-            """
-            📦 *Status do download*
-
-            _${statusLabel(job.status)}_ • *${job.progress}%*
-            ${job.title}
-            """.trimIndent()
+            text.statusActive(statusLabel(job.status), job.progress, job.title)
         }
-        whatsapp.sendText(message.chatId, text, message.id)
+        whatsapp.sendText(message.chatId, response, message.id)
     }
 
-    private suspend fun cancel(message: IncomingWhatsAppMessage) {
+    private suspend fun cancel(message: IncomingWhatsAppMessage, text: BotMessages) {
         val job = jobDao.activeForChat(message.chatId)
         if (job == null) {
-            whatsapp.sendText(message.chatId, "✅ *Nada para cancelar*\n\nNão há nenhum download ativo no momento.", message.id)
+            whatsapp.sendText(message.chatId, text.nothingToCancel(), message.id)
         } else {
             queue.cancel(job.id)
-            whatsapp.sendText(message.chatId, "🛑 *Download cancelado com sucesso.*", message.id)
+            whatsapp.sendText(message.chatId, text.cancelled(), message.id)
         }
     }
 
@@ -167,41 +164,6 @@ class BotEngine(
             ?.takeIf { it.isNotBlank() }
     }
 
-    private fun helpText() = """
-        🤖 *ZapTube Bot*
-
-        *Como pesquisar*
-        Envie */* junto com o que você quer buscar.
-
-        _Exemplos:_
-        */música de zelda*
-        */abertura pokemon*
-
-        *Como baixar*
-        🎬 Vídeo: */v1*
-        🎧 Áudio: */a1*
-
-        */status*
-        Mostra o andamento do download atual.
-
-        */cancel*
-        Cancela o download atual.
-    """.trimIndent()
-
-    private fun downloadStartedText(video: YouTubeVideoResult, type: DownloadType): String {
-        val icon = if (type == DownloadType.VIDEO) "🎬" else "🎧"
-        return """
-            $icon *Download iniciado*
-
-            *${video.title}*
-            ⏱️ _Duração:_ ${video.durationText}
-            🗓️ _Publicado:_ ${video.publishedText ?: "Não informado"}
-            📺 _Canal:_ ${video.channel}
-
-            _Assim que estiver pronto, eu envio aqui no WhatsApp._
-        """.trimIndent()
-    }
-
     private fun statusLabel(status: DownloadStatus): String = when (status) {
         DownloadStatus.QUEUED -> "Na fila"
         DownloadStatus.DOWNLOADING -> "Baixando"
@@ -219,6 +181,12 @@ class BotEngine(
         alertScope.launch {
             runCatching { whatsapp.sendTextToGroupName(ALERT_GROUP_NAME, text) }
         }
+    }
+
+    private fun localizedInvalid(reason: String, text: BotMessages): String = when {
+        reason.contains("/v1") -> text.invalidIndex(8)
+        reason.contains("/a1") -> text.invalidIndex(8)
+        else -> text.emptySearch()
     }
 
     private companion object {

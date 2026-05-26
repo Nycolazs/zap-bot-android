@@ -12,11 +12,13 @@ data class BotSettingsEntity(
     val autoStartOnBoot: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val detailedNotificationsEnabled: Boolean = true,
-    val maxConcurrentDownloads: Int = 2,
-    val videoQualityLimit: String = "480p",
+    val maxConcurrentDownloads: Int = 5,
+    val videoQualityLimit: String = "360p",
     val audioBitrate: String = "128k",
     val deleteFilesAfterSending: Boolean = true,
     val themeMode: String = "system",
+    val appLanguage: String = "en",
+    val botLanguage: String = "pt",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

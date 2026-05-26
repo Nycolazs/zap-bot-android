@@ -3,7 +3,9 @@ package com.zapbot.android.service
 import android.app.Service
 import android.os.BatteryManager
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import com.zapbot.android.ZapBotApplication
 import com.zapbot.android.domain.BotCommandParser
@@ -15,17 +17,29 @@ import com.zapbot.android.queue.DownloadQueueManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.Executors
+import kotlin.math.max
 
 class BotForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val messageDispatcher = Executors
+        .newFixedThreadPool(max(4, Runtime.getRuntime().availableProcessors())) { runnable ->
+            Thread(runnable, "zapbot-message").apply {
+                priority = Thread.MAX_PRIORITY
+            }
+        }
+        .asCoroutineDispatcher()
     private lateinit var queue: DownloadQueueManager
     private var started = false
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -40,10 +54,17 @@ class BotForegroundService : Service() {
         if (started) return
         started = true
         val container = (application as ZapBotApplication).container
+        BotRuntimeState.markStarted()
         startForeground(
             BotNotificationManager.NOTIFICATION_ID,
-            container.notifications.build(WhatsAppConnectionState.Connecting, 0)
+            container.notifications.build(
+                WhatsAppConnectionState.Connecting,
+                0,
+                BotRuntimeState.startedAt.value,
+                themeMode = runBlocking(Dispatchers.IO) { container.settings.get().themeMode }
+            )
         )
+        acquirePerformanceLocks()
         queue = DownloadQueueManager(
             scope = scope,
             jobDao = container.database.downloadJobDao(),
@@ -61,6 +82,7 @@ class BotForegroundService : Service() {
             jobDao = container.database.downloadJobDao(),
             queue = queue,
             whatsapp = container.whatsappClient,
+            settings = container.settings,
             logger = container.logger
         )
         scope.launch(Dispatchers.IO) { container.whatsappClient.start() }
@@ -68,18 +90,25 @@ class BotForegroundService : Service() {
             container.whatsappClient.incomingMessages
                 .catch { container.logger.error("Service", "Message stream failed", it) }
                 .collect {
-                    scope.launch(Dispatchers.IO) {
-                        container.logger.info("Service", "Message received from ${it.senderLabel()}")
+                    scope.launch(messageDispatcher) {
                         engine.handle(it)
+                        scope.launch(Dispatchers.IO) {
+                            container.logger.info("Service", "Message handled from ${it.senderLabel()}")
+                        }
                     }
                 }
         }
         scope.launch {
             combine(
                 container.whatsappClient.connectionState,
-                container.database.downloadJobDao().observeActiveCount()
-            ) { state, count -> state to count }
-                .collect { (state, count) -> container.notifications.notify(container.notifications.build(state, count)) }
+                container.database.downloadJobDao().observeActiveCount(),
+                container.settings.settings
+            ) { state, count, settings -> Triple(state, count, settings.themeMode) }
+                .collect { (state, count, themeMode) ->
+                    container.notifications.notify(
+                        container.notifications.build(state, count, BotRuntimeState.startedAt.value, themeMode = themeMode)
+                    )
+                }
         }
         scope.launch(Dispatchers.IO) {
             var lastBatteryAlertAt = 0L
@@ -104,6 +133,9 @@ class BotForegroundService : Service() {
     override fun onDestroy() {
         val container = (application as ZapBotApplication).container
         runBlocking(Dispatchers.IO) { container.whatsappClient.stop() }
+        BotRuntimeState.markStopped()
+        releasePerformanceLocks()
+        messageDispatcher.close()
         scope.cancel()
         super.onDestroy()
     }
@@ -120,6 +152,30 @@ class BotForegroundService : Service() {
                 Intent(context, BotForegroundService::class.java).setAction(ACTION_START)
             )
         }
+    }
+
+    private fun acquirePerformanceLocks() {
+        runCatching {
+            val power = getSystemService(PowerManager::class.java)
+            wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ZapBot:Runtime").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+        runCatching {
+            val wifi = applicationContext.getSystemService(WifiManager::class.java)
+            wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ZapBot:Wifi").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releasePerformanceLocks() {
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
+        wakeLock = null
+        runCatching { wifiLock?.takeIf { it.isHeld }?.release() }
+        wifiLock = null
     }
 }
 

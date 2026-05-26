@@ -29,10 +29,10 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         val request = baseRequest(video, outputDir).apply {
             addOption(
                 "-f",
-                "best[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4]"
+                "best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]+bestaudio[ext=m4a]/bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]"
             )
             addOption("--merge-output-format", "mp4")
-            addOption("-S", "res:$height,ext:mp4:m4a,+size")
+            addOption("-S", "res:$height,hasaud,ext:mp4:m4a,+size")
         }
         emit(DownloadProgress(5, "Baixando vídeo"))
         executeAndValidate(request, processId(jobId), outputDir)
@@ -46,12 +46,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         emit(DownloadProgress(0, "Preparando download"))
         val request = baseRequest(video, outputDir).apply {
             addOption("-f", "bestaudio/best")
-            addOption("-x")
-            addOption("--audio-format", "mp3")
-            addOption("--audio-quality", bitrate.uppercase())
-            addOption("--add-metadata")
-            addOption("--embed-thumbnail")
-            addOption("--convert-thumbnails", "jpg")
+            addOption("-S", "+size")
         }
         emit(DownloadProgress(5, "Baixando áudio"))
         executeAndValidate(request, processId(jobId), outputDir)
@@ -80,6 +75,9 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             addOption("--no-mtime")
             addOption("--no-warnings")
             addOption("--force-ipv4")
+            addOption("--concurrent-fragments", "8")
+            addOption("--retries", "3")
+            addOption("--fragment-retries", "3")
             addOption("--extractor-args", "youtube:player_client=android,ios,web")
             addOption("--user-agent", YOUTUBE_USER_AGENT)
             addOption("--referer", "https://www.youtube.com/")

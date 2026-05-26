@@ -5,6 +5,7 @@ import com.zapbot.android.database.DownloadJobDao
 import com.zapbot.android.domain.DownloadRequest
 import com.zapbot.android.domain.DownloadStatus
 import com.zapbot.android.domain.DownloadType
+import com.zapbot.android.domain.BotMessages
 import com.zapbot.android.downloader.MediaDownloader
 import com.zapbot.android.logging.BotLogger
 import com.zapbot.android.settings.SettingsRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlin.math.max
 
 class DownloadQueueManager(
     private val scope: CoroutineScope,
@@ -38,7 +40,7 @@ class DownloadQueueManager(
             jobDao.unfinished().forEach {
                 jobDao.finish(it.id, DownloadStatus.FAILED, "Job interrupted by app restart")
             }
-            val semaphore = Semaphore(settings.maxConcurrentDownloads.coerceIn(1, 5))
+            val semaphore = Semaphore(settings.maxConcurrentDownloads.coerceIn(1, max(4, Runtime.getRuntime().availableProcessors())))
             for (request in queue) {
                 launch { semaphore.withPermit { process(request) } }
             }
@@ -64,7 +66,13 @@ class DownloadQueueManager(
             } else {
                 downloader.downloadAudio(request.jobId, request.video, outputDir, settings.audioBitrate)
             }
-            flow.collectLatest { progress -> update(request.jobId, DownloadStatus.DOWNLOADING, progress.percent) }
+            var lastProgress = -10
+            flow.collectLatest { progress ->
+                if (progress.percent == 100 || progress.percent - lastProgress >= 5) {
+                    lastProgress = progress.percent
+                    update(request.jobId, DownloadStatus.DOWNLOADING, progress.percent)
+                }
+            }
             update(request.jobId, DownloadStatus.SENDING, 100)
             val result = downloader.resultFile(outputDir)
             validateWhatsAppMedia(request, result.file)
@@ -77,9 +85,10 @@ class DownloadQueueManager(
             cleanup.cleanJob(request.jobId)
             jobDao.finish(request.jobId, DownloadStatus.FAILED, safeError(t))
             alert("🚨 *Erro no download/envio*\n\n_Título:_ ${request.video.title}\n_Motivo:_ ${safeError(t)}")
+            val text = BotMessages(settingsRepository.get().botLanguage)
             whatsappClient.sendText(
                 request.chatId,
-                "⚠️ *Não consegui concluir o envio*\n\n_Motivo:_ ${safeError(t)}\n\nVocê pode tentar outro resultado da lista ou baixar somente o áudio com */a1*.",
+                text.sendFailed(safeError(t)),
                 request.messageId
             )
             logger.error("Queue", "Job ${request.jobId} failed", t)

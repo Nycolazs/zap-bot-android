@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.ui.AppStrings
 import com.zapbot.android.ui.DashboardState
 
 @Composable
@@ -56,6 +57,7 @@ fun HomeScreen(
     onStop: () -> Unit,
     onFailedClick: () -> Unit
 ) {
+    fun t(key: String) = AppStrings.label(state.settings.appLanguage, key)
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         AnimatedVisibility(
             visible = true,
@@ -64,16 +66,16 @@ fun HomeScreen(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("ZapTube Bot", style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    "WhatsApp automation console",
+                    t("subtitle"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         AnimatedVisibility(visible = true, enter = fadeIn(tween(550))) {
-            StatusHero(state)
+            StatusHero(state, ::t)
         }
-        BotActionButton(state.connection, onStart, onStop)
+        BotActionButton(state.connection, ::t, onStart, onStop)
         AnimatedVisibility(
             visible = state.connection is WhatsAppConnectionState.WaitingForQr,
             enter = fadeIn() + slideInVertically { it / 3 },
@@ -90,13 +92,14 @@ fun HomeScreen(
                 }
             }
         }
-        StatsCard(state, onFailedClick)
+        StatsCard(state, ::t, onFailedClick)
     }
 }
 
 @Composable
 private fun BotActionButton(
     connection: WhatsAppConnectionState,
+    t: (String) -> String,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -109,7 +112,7 @@ private fun BotActionButton(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
                 Icon(Icons.Outlined.Stop, contentDescription = null)
-                Text("Stop bot")
+                Text(t("stop_bot"))
             }
         } else {
             val pulse = rememberInfiniteTransition(label = "startPulse").animateFloat(
@@ -125,14 +128,14 @@ private fun BotActionButton(
                     .scale(pulse.value)
             ) {
                 Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                Text("Start bot")
+                Text(t("start_bot"))
             }
         }
     }
 }
 
 @Composable
-private fun StatusHero(state: DashboardState) {
+private fun StatusHero(state: DashboardState, t: (String) -> String) {
     val pulse = rememberInfiniteTransition(label = "statusPulse").animateFloat(
         initialValue = 0.45f,
         targetValue = 1f,
@@ -140,11 +143,11 @@ private fun StatusHero(state: DashboardState) {
         label = "statusAlpha"
     )
     val label = when (val connection = state.connection) {
-        WhatsAppConnectionState.Disconnected -> "Disconnected"
-        is WhatsAppConnectionState.WaitingForQr -> "Waiting for QR code"
-        WhatsAppConnectionState.Connecting -> "Connecting"
-        is WhatsAppConnectionState.Connected -> "Connected ${connection.phoneNumber.orEmpty()}"
-        WhatsAppConnectionState.Running -> "Running"
+        WhatsAppConnectionState.Disconnected -> t("disconnected")
+        is WhatsAppConnectionState.WaitingForQr -> t("waiting_qr")
+        WhatsAppConnectionState.Connecting -> t("connecting")
+        is WhatsAppConnectionState.Connected -> "${t("connected")} ${connection.phoneNumber.orEmpty()}"
+        WhatsAppConnectionState.Running -> t("running")
         is WhatsAppConnectionState.Error -> "Error: ${connection.message}"
     }
     Card(
@@ -167,13 +170,13 @@ private fun StatusHero(state: DashboardState) {
                         )
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                    Text("Bot status", style = MaterialTheme.typography.titleMedium)
+                    Text(t("bot_status"), style = MaterialTheme.typography.titleMedium)
                     Text(label, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             val error = (state.connection as? WhatsAppConnectionState.Error)?.message
             if (error != null) {
-                Text("Last error: $error", color = MaterialTheme.colorScheme.error)
+                Text("${t("last_error")}: $error", color = MaterialTheme.colorScheme.error)
             }
             Surface(
                 shape = RoundedCornerShape(8.dp),
@@ -184,8 +187,8 @@ private fun StatusHero(state: DashboardState) {
                     Modifier.padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    CompactMetric("Active", state.activeDownloads.toString(), modifier = Modifier.weight(1f))
-                    CompactMetric("Uptime", state.uptimeText, modifier = Modifier.weight(1f))
+                    CompactMetric(t("active"), state.activeDownloads.toString(), modifier = Modifier.weight(1f))
+                    CompactMetric(t("uptime"), state.uptimeText, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -193,19 +196,19 @@ private fun StatusHero(state: DashboardState) {
 }
 
 @Composable
-private fun StatsCard(state: DashboardState, onFailedClick: () -> Unit) {
+private fun StatsCard(state: DashboardState, t: (String) -> String, onFailedClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Today", style = MaterialTheme.typography.titleMedium)
+            Text(t("today"), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                StatItem(Icons.Outlined.Chat, "Messages", state.messagesReceived.toString(), Modifier.weight(1f))
-                StatItem(Icons.Outlined.Search, "Searches", state.searchesPerformed.toString(), Modifier.weight(1f))
+                StatItem(Icons.Outlined.Chat, t("messages"), state.messagesReceived.toString(), Modifier.weight(1f))
+                StatItem(Icons.Outlined.Search, t("searches"), state.searchesPerformed.toString(), Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                StatItem(Icons.Outlined.DownloadDone, "Completed", state.downloadsCompleted.toString(), Modifier.weight(1f))
+                StatItem(Icons.Outlined.DownloadDone, t("completed"), state.downloadsCompleted.toString(), Modifier.weight(1f))
                 StatItem(
                     Icons.Outlined.ErrorOutline,
-                    "Failed",
+                    t("failed"),
                     state.failedJobs.toString(),
                     Modifier.weight(1f),
                     onClick = onFailedClick,

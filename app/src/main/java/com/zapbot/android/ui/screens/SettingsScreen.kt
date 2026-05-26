@@ -16,6 +16,10 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -39,8 +43,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zapbot.android.database.BotSettingsEntity
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.ui.AppStrings
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     modifier: Modifier,
@@ -54,6 +60,7 @@ fun SettingsScreen(
     pairingCode: String?,
     pairingError: String?
 ) {
+    fun t(key: String) = AppStrings.label(settings.appLanguage, key)
     var phone by remember { mutableStateOf("") }
     var cooldownSeconds by remember { mutableIntStateOf(0) }
     val clipboard = LocalClipboardManager.current
@@ -73,10 +80,10 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text(t("settings"), style = MaterialTheme.typography.headlineSmall)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("WhatsApp integration", style = MaterialTheme.typography.titleMedium)
+                Text(t("whatsapp_integration"), style = MaterialTheme.typography.titleMedium)
                 AnimatedVisibility(visible = hasWhatsAppSession) {
                     Row(
                         Modifier
@@ -91,9 +98,9 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("OK - WhatsApp session saved", style = MaterialTheme.typography.titleSmall)
+                            Text(t("session_saved"), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                sessionStatus(connection),
+                                sessionStatus(connection, ::t),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -103,7 +110,7 @@ fun SettingsScreen(
                 AnimatedVisibility(visible = !hasWhatsAppSession) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "This bot connects as a real linked device for your personal WhatsApp account. Enter the number from the main phone, then approve the code in WhatsApp > Linked devices.",
+                            t("pairing_intro"),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         OutlinedTextField(
@@ -115,7 +122,7 @@ fun SettingsScreen(
                                     cooldownSeconds = 0
                                 }
                             },
-                            label = { Text("WhatsApp number") },
+                            label = { Text(t("whatsapp_number")) },
                             placeholder = { Text("15551234567") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -131,9 +138,9 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 if (cooldownSeconds > 0) {
-                                    "Generate again in ${cooldownSeconds}s"
+                                    "${t("generate_again")} ${cooldownSeconds}s"
                                 } else {
-                                    "Generate Linked Devices code"
+                                    t("generate_code")
                                 }
                             )
                         }
@@ -146,14 +153,14 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Code: $pairingCode",
+                                    "${t("code")}: $pairingCode",
                                     style = MaterialTheme.typography.headlineSmall,
                                     modifier = Modifier.weight(1f)
                                 )
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy code")
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = t("copy_code"))
                             }
-                            Text("Tap the code to copy it.", style = MaterialTheme.typography.bodySmall)
-                            Text("In WhatsApp: Linked devices > Link with phone number.")
+                            Text(t("tap_copy"), style = MaterialTheme.typography.bodySmall)
+                            Text(t("link_phone"))
                         }
                         if (pairingError != null) {
                             Text(pairingError, color = MaterialTheme.colorScheme.error)
@@ -161,54 +168,64 @@ fun SettingsScreen(
                     }
                 }
                 Text(
-                    "Regular messages are ignored silently. The bot only replies to slash commands such as /help, /music search, /v, /a, /status, and /cancel.",
+                    t("regular_messages"),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         }
-        ToggleRow("Start when the phone boots", settings.autoStartOnBoot) { onUpdate { it.copy(autoStartOnBoot = !it.autoStartOnBoot) } }
-        ToggleRow("Notifications", settings.notificationsEnabled) { onUpdate { it.copy(notificationsEnabled = !it.notificationsEnabled) } }
-        ToggleRow("Detailed notifications", settings.detailedNotificationsEnabled) { onUpdate { it.copy(detailedNotificationsEnabled = !it.detailedNotificationsEnabled) } }
-        ThemeModeSection(settings.themeMode) { themeMode ->
+        ToggleRow(t("start_boot"), settings.autoStartOnBoot) { onUpdate { it.copy(autoStartOnBoot = !it.autoStartOnBoot) } }
+        ToggleRow(t("notifications"), settings.notificationsEnabled) { onUpdate { it.copy(notificationsEnabled = !it.notificationsEnabled) } }
+        ToggleRow(t("detailed_notifications"), settings.detailedNotificationsEnabled) { onUpdate { it.copy(detailedNotificationsEnabled = !it.detailedNotificationsEnabled) } }
+        ThemeModeSection(::t, settings.themeMode) { themeMode ->
             onUpdate { it.copy(themeMode = themeMode) }
         }
+        LanguageSection(
+            title = t("app_language"),
+            selected = settings.appLanguage,
+            onSelected = { language -> onUpdate { it.copy(appLanguage = language) } }
+        )
+        LanguageSection(
+            title = t("bot_language"),
+            selected = settings.botLanguage,
+            onSelected = { language -> onUpdate { it.copy(botLanguage = language) } }
+        )
         FilledTonalButton(onClick = onBattery, modifier = Modifier.fillMaxWidth()) {
-            Text("Open battery settings")
+            Text(t("battery"))
         }
         HorizontalDivider()
-        Text("Simultaneous downloads", style = MaterialTheme.typography.titleMedium)
+        Text(t("downloads"), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (1..5).forEach { value ->
+            (1..8).forEach { value ->
                 FilterChip(selected = settings.maxConcurrentDownloads == value, onClick = { onUpdate { it.copy(maxConcurrentDownloads = value) } }, label = { Text("$value") })
             }
         }
-        Text("Video quality", style = MaterialTheme.typography.titleMedium)
+        Text(t("quality"), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("360p", "480p", "720p").forEach { value ->
                 FilterChip(selected = settings.videoQualityLimit == value, onClick = { onUpdate { it.copy(videoQualityLimit = value) } }, label = { Text(value) })
             }
         }
-        Text("Audio", style = MaterialTheme.typography.titleMedium)
+        Text(t("audio"), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("96k", "128k", "160k").forEach { value ->
                 FilterChip(selected = settings.audioBitrate == value, onClick = { onUpdate { it.copy(audioBitrate = value) } }, label = { Text(value) })
             }
         }
-        Button(onClick = onClearSession, modifier = Modifier.fillMaxWidth()) { Text("Clear WhatsApp cache") }
+        Button(onClick = onClearSession, modifier = Modifier.fillMaxWidth()) { Text(t("clear_cache")) }
     }
 }
 
 private const val PAIRING_CODE_COOLDOWN_SECONDS = 15
 
 @Composable
-private fun ThemeModeSection(themeMode: String, onThemeModeChange: (String) -> Unit) {
+private fun ThemeModeSection(t: (String) -> String, themeMode: String, onThemeModeChange: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Appearance", style = MaterialTheme.typography.titleMedium)
+        Text(t("appearance"), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
-                "system" to "System",
-                "light" to "Light",
-                "dark" to "Dark"
+                "system" to t("system"),
+                "light" to t("light"),
+                "dark" to t("dark")
             ).forEach { (value, label) ->
                 FilterChip(
                     selected = themeMode == value,
@@ -220,11 +237,52 @@ private fun ThemeModeSection(themeMode: String, onThemeModeChange: (String) -> U
     }
 }
 
-private fun sessionStatus(connection: WhatsAppConnectionState): String = when (connection) {
-    is WhatsAppConnectionState.Connected -> "This bot already has a saved WhatsApp session${connection.phoneNumber?.let { " for $it" }.orEmpty()}."
-    WhatsAppConnectionState.Running -> "This bot already has a saved WhatsApp session and is running."
-    WhatsAppConnectionState.Disconnected -> "This bot already has a saved WhatsApp session. Start the bot to connect."
-    else -> "This bot already has a saved WhatsApp session."
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageSection(title: String, selected: String, onSelected: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        "en" to "English",
+        "pt" to "Português",
+        "es" to "Español",
+        "ru" to "Русский"
+    )
+    val selectedLabel = options.firstOrNull { it.first == selected }?.second ?: "English"
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedLabel,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth()
+            )
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { (value, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelected(value)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun sessionStatus(connection: WhatsAppConnectionState, t: (String) -> String): String = when (connection) {
+    is WhatsAppConnectionState.Connected -> "${t("session_saved_detail")}${connection.phoneNumber?.let { " $it" }.orEmpty()}"
+    WhatsAppConnectionState.Running -> t("session_running")
+    WhatsAppConnectionState.Disconnected -> t("session_disconnected")
+    else -> t("session_saved_detail")
 }
 
 @Composable

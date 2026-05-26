@@ -8,6 +8,9 @@ import com.zapbot.android.database.BotLogEntity
 import com.zapbot.android.database.BotSettingsEntity
 import com.zapbot.android.database.DownloadJobEntity
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.service.BotRuntimeState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -31,9 +34,14 @@ data class DashboardState(
 )
 
 class MainViewModel(private val container: AppContainer) : ViewModel() {
-    private val startedAt = System.currentTimeMillis()
     private val pairingCode = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val pairingError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val ticker = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(1_000)
+        }
+    }
 
     val state: StateFlow<DashboardState> = combine(
         container.settings.settings,
@@ -43,7 +51,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         container.database.downloadJobDao().observeRecent(),
         container.whatsappClient.hasSavedSession,
         pairingCode,
-        pairingError
+        pairingError,
+        BotRuntimeState.startedAt,
+        ticker
     ) { values ->
         val settings = values[0] as BotSettingsEntity
         val connection = values[1] as WhatsAppConnectionState
@@ -56,8 +66,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             activeDownloads = active,
             logs = logs,
             jobs = jobs.filter { it.createdAt >= System.currentTimeMillis() - 24 * 60 * 60 * 1_000L },
-            uptimeText = "${((System.currentTimeMillis() - startedAt) / 60_000).coerceAtLeast(0)} min",
-            messagesReceived = logs.count { it.message.contains("message", ignoreCase = true) },
+            uptimeText = uptimeText(values[8] as Long?, values[9] as Long),
+            messagesReceived = logs.count { it.tag == "BotEngine" || it.tag == "Queue" },
             searchesPerformed = logs.count { it.message.contains("search", ignoreCase = true) },
             downloadsCompleted = jobs.count { it.status.name == "COMPLETED" },
             failedJobs = jobs.count { it.status.name == "FAILED" },
@@ -96,6 +106,19 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             }.onFailure {
                 pairingError.value = it.message ?: "Could not generate a code."
             }.getOrNull()
+        }
+    }
+
+    private fun uptimeText(startedAt: Long?, now: Long): String {
+        if (startedAt == null) return "0s"
+        val totalSeconds = ((now - startedAt) / 1_000).coerceAtLeast(0)
+        val hours = totalSeconds / 3_600
+        val minutes = (totalSeconds % 3_600) / 60
+        val seconds = totalSeconds % 60
+        return when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            minutes > 0 -> "${minutes}m ${seconds}s"
+            else -> "${seconds}s"
         }
     }
 

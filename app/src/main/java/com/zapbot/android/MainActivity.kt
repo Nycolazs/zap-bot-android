@@ -10,8 +10,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.zapbot.android.service.BotForegroundService
 import com.zapbot.android.ui.MainApp
 import com.zapbot.android.ui.MainViewModel
@@ -30,19 +35,27 @@ class MainActivity : ComponentActivity() {
         contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         setContent {
             val state by viewModel.state.collectAsState()
-            ZapBotTheme(themeMode = state.settings.themeMode) {
-                MainApp(
-                    viewModel = viewModel,
-                    onStart = { BotForegroundService.start(this) },
-                    onStop = { startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP)) },
-                    onBattery = {
-                        runCatching {
-                            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")))
-                        }.onFailure {
-                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+            var selectedPage by rememberSaveable { mutableStateOf(0) }
+            var showErrorsOnly by rememberSaveable { mutableStateOf(false) }
+            Crossfade(targetState = state.settings.themeMode, animationSpec = tween(450), label = "themeMode") { themeMode ->
+                ZapBotTheme(themeMode = themeMode) {
+                    MainApp(
+                        viewModel = viewModel,
+                        selectedPage = selectedPage,
+                        onSelectedPageChange = { selectedPage = it },
+                        showErrorsOnly = showErrorsOnly,
+                        onShowErrorsOnlyChange = { showErrorsOnly = it },
+                        onStart = { BotForegroundService.start(this) },
+                        onStop = { startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP)) },
+                        onBattery = {
+                            runCatching {
+                                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")))
+                            }.onFailure {
+                                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
