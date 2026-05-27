@@ -10,15 +10,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         BotSettingsEntity::class,
         ChatSearchSessionEntity::class,
+        ChatWelcomeEntity::class,
         DownloadJobEntity::class,
         BotLogEntity::class
     ],
-    version = 7
+    version = 8
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun settingsDao(): BotSettingsDao
     abstract fun searchSessionDao(): ChatSearchSessionDao
+    abstract fun welcomeDao(): ChatWelcomeDao
     abstract fun downloadJobDao(): DownloadJobDao
     abstract fun logDao(): BotLogDao
 
@@ -61,6 +63,19 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bot_settings ADD COLUMN blacklistedNumbers TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_welcomes (
+                        chatId TEXT NOT NULL PRIMARY KEY,
+                        welcomedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

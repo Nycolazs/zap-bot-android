@@ -58,11 +58,6 @@ class BotCommandParserTest {
         assertEquals(BotCommand.Invalid("SOCIAL_AUDIO_NOT_SUPPORTED"), parser.parse("/a https://www.tiktok.com/@user/video/1234567890"))
     }
 
-    @Test fun parsesStickerCommands() {
-        assertEquals(BotCommand.Sticker, parser.parse("/sticker"))
-        assertEquals(BotCommand.Sticker, parser.parse("/figurinha"))
-    }
-
     @Test fun rejectsBadIndex() {
         assertTrue(parser.parse("/v x") is BotCommand.Invalid)
         assertTrue(parser.parse("/a 0") is BotCommand.Invalid)

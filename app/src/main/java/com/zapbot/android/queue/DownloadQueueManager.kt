@@ -144,7 +144,7 @@ class DownloadQueueManager(
     }
 
     private companion object {
-        const val ALERT_GROUP_NAME = "Alerta Music Bot"
+        const val ALERT_GROUP_NAME = "Alerta Zappy"
         const val MAX_WHATSAPP_VIDEO_BYTES = 1536L * 1024L * 1024L
         val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mov", "mkv")
         val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "mp4a", "opus", "ogg", "zip")

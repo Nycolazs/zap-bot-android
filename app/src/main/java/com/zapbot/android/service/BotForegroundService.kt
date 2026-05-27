@@ -33,7 +33,7 @@ class BotForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val messageDispatcher = Executors
         .newFixedThreadPool(max(4, Runtime.getRuntime().availableProcessors())) { runnable ->
-            Thread(runnable, "zapbot-message").apply {
+            Thread(runnable, "zappy-message").apply {
                 priority = Thread.MAX_PRIORITY
             }
         }
@@ -92,6 +92,7 @@ class BotForegroundService : Service() {
             parser = BotCommandParser(),
             youtube = container.youtubeClient,
             sessions = container.sessions,
+            welcomes = container.database.welcomeDao(),
             jobDao = container.database.downloadJobDao(),
             queue = queue,
             whatsapp = container.whatsappClient,
@@ -147,7 +148,7 @@ class BotForegroundService : Service() {
                     lastBatteryAlertAt = now
                     runCatching {
                         container.whatsappClient.sendTextToGroupName(
-                            "Alerta Music Bot",
+                            "Alerta Zappy",
                             "🔋 *Bateria baixa no celular do bot*\n\n_Nível atual:_ *$level%*\n\nColoque o aparelho para carregar para evitar que o bot caia."
                         )
                     }
@@ -186,14 +187,14 @@ class BotForegroundService : Service() {
     private fun acquirePerformanceLocks() {
         runCatching {
             val power = getSystemService(PowerManager::class.java)
-            wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ZapBot:Runtime").apply {
+            wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Zappy:Runtime").apply {
                 setReferenceCounted(false)
                 acquire()
             }
         }
         runCatching {
             val wifi = applicationContext.getSystemService(WifiManager::class.java)
-            wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ZapBot:Wifi").apply {
+            wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Zappy:Wifi").apply {
                 setReferenceCounted(false)
                 acquire()
             }

@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
 
 class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
     private val bridgeDispatcher = Executors.newFixedThreadPool(4) { runnable ->
-        Thread(runnable, "zapbot-whatsapp").apply {
+        Thread(runnable, "zappy-whatsapp").apply {
             priority = Thread.MAX_PRIORITY
         }
     }.asCoroutineDispatcher()

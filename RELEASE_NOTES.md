@@ -1,6 +1,14 @@
-# ZapTube Bot v1.4.4
+# Zappy v1.4.5
 
 ## What's New
+
+- Renamed the project and app to Zappy.
+- Added a one-time first-message welcome with basic commands in the selected bot-message language.
+- Fixed relative published dates from YouTube search results so values such as `há 6 anos` are localized with the bot-message language.
+- Updated the README with clearer setup, command, operation, and development guidance.
+- Removed the old sticker slash commands from public usage; private-chat images are still converted to stickers automatically.
+
+## Previous v1.4.4 Highlights
 
 - Added public Instagram and TikTok video URL downloads through `/v <url>`.
 - Added automatic private-chat image-to-sticker conversion, disabled in groups.

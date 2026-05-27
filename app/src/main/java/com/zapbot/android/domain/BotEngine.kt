@@ -2,6 +2,8 @@ package com.zapbot.android.domain
 
 import com.zapbot.android.data.SearchSessionRepository
 import com.zapbot.android.data.SelectionResult
+import com.zapbot.android.database.ChatWelcomeDao
+import com.zapbot.android.database.ChatWelcomeEntity
 import com.zapbot.android.database.DownloadJobDao
 import com.zapbot.android.database.DownloadJobEntity
 import com.zapbot.android.logging.BotLogger
@@ -18,6 +20,7 @@ class BotEngine(
     private val parser: BotCommandParser,
     private val youtube: YouTubeSearchClient,
     private val sessions: SearchSessionRepository,
+    private val welcomes: ChatWelcomeDao,
     private val jobDao: DownloadJobDao,
     private val queue: DownloadQueueManager,
     private val whatsapp: WhatsAppClient,
@@ -33,6 +36,7 @@ class BotEngine(
             return
         }
         val text = BotMessages(currentSettings.botLanguage)
+        sendWelcomeIfNeeded(message, text)
         if (message.hasIncomingImage() && !message.isGroupChat()) {
             sendSticker(message, text)
             return
@@ -50,6 +54,12 @@ class BotEngine(
             is BotCommand.Invalid -> whatsapp.sendText(message.chatId, localizedInvalid(command.reason, text), message.id)
             BotCommand.Unknown -> Unit
         }
+    }
+
+    private suspend fun sendWelcomeIfNeeded(message: IncomingWhatsAppMessage, text: BotMessages) {
+        if (welcomes.hasWelcomed(message.chatId)) return
+        if (welcomes.insert(ChatWelcomeEntity(message.chatId)) == -1L) return
+        whatsapp.sendText(message.chatId, text.welcome(), message.id)
     }
 
     private suspend fun search(message: IncomingWhatsAppMessage, query: String, text: BotMessages) {
@@ -246,7 +256,7 @@ class BotEngine(
 
     private companion object {
         const val SEARCH_RESULT_LIMIT = 8
-        const val ALERT_GROUP_NAME = "Alerta Music Bot"
+        const val ALERT_GROUP_NAME = "Alerta Zappy"
     }
 }
 

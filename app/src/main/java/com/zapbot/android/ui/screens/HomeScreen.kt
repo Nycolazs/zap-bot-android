@@ -65,7 +65,7 @@ fun HomeScreen(
             enter = fadeIn(tween(450)) + slideInVertically(tween(450)) { -it / 4 }
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("ZapTube Bot", style = MaterialTheme.typography.headlineMedium)
+                Text("Zappy", style = MaterialTheme.typography.headlineMedium)
                 Text(
                     t("subtitle"),
                     style = MaterialTheme.typography.bodyMedium,

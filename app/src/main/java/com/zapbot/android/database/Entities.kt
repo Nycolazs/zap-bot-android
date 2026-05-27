@@ -34,6 +34,12 @@ data class ChatSearchSessionEntity(
     val expiresAt: Long
 )
 
+@Entity(tableName = "chat_welcomes")
+data class ChatWelcomeEntity(
+    @PrimaryKey val chatId: String,
+    val welcomedAt: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "download_jobs")
 data class DownloadJobEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

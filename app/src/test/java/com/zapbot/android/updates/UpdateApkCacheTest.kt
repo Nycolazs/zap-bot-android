@@ -41,8 +41,8 @@ class UpdateApkCacheTest {
         UpdateApkCache.writeMetadata(cacheDir, release)
 
         assertNull(UpdateApkCache.cachedApk(cacheDir, release(tag = "v1.4.4", version = "1.4.4")))
-        assertNull(UpdateApkCache.cachedApk(cacheDir, release(apkName = "zapbot-1.4.4.apk")))
-        assertNull(UpdateApkCache.cachedApk(cacheDir, release(apkUrl = "https://example.com/zapbot-1.4.4.apk")))
+        assertNull(UpdateApkCache.cachedApk(cacheDir, release(apkName = "zappy-1.4.4.apk")))
+        assertNull(UpdateApkCache.cachedApk(cacheDir, release(apkUrl = "https://example.com/zappy-1.4.4.apk")))
     }
 
     @Test fun ignoresApkWithoutReleaseMetadata() {
@@ -57,8 +57,8 @@ class UpdateApkCacheTest {
     private fun release(
         tag: String = "v1.4.3",
         version: String = "1.4.3",
-        apkName: String = "zapbot-1.4.3.apk",
-        apkUrl: String = "https://example.com/zapbot-1.4.3.apk"
+        apkName: String = "zappy-1.4.3.apk",
+        apkUrl: String = "https://example.com/zappy-1.4.3.apk"
     ) = UpdateChecker.ReleaseInfo(
         version = version,
         tag = tag,

@@ -47,7 +47,7 @@ class UpdateChecker(
         val request = Request.Builder()
             .url(GITHUB_LATEST_RELEASE)
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "ZapTube-Bot-Android")
+            .header("User-Agent", "Zappy-Android")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("GitHub returned HTTP ${response.code}")
@@ -78,7 +78,7 @@ class UpdateChecker(
         tempOutput.delete()
         val request = Request.Builder()
             .url(release.apkUrl)
-            .header("User-Agent", "ZapTube-Bot-Android")
+            .header("User-Agent", "Zappy-Android")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("Download returned HTTP ${response.code}")
@@ -130,7 +130,7 @@ class UpdateChecker(
 
     private fun message(language: String, key: String, value: String = ""): String = when (language) {
         "pt" -> when (key) {
-            "permission" -> "Permita que o ZapTube Bot instale atualizações e toque em Verificar atualizações novamente."
+            "permission" -> "Permita que o Zappy instale atualizações e toque em Verificar atualizações novamente."
             "unavailable" -> "Não encontrei um APK disponível na última release do GitHub."
             "up_to_date" -> "Você já está na versão mais recente ($value)."
             "already_downloaded" -> "Atualização $value já baixada. Confirme a instalação no Android."
@@ -138,7 +138,7 @@ class UpdateChecker(
             else -> "Não consegui verificar atualizações: $value"
         }
         "es" -> when (key) {
-            "permission" -> "Permite que ZapTube Bot instale actualizaciones y toca Buscar actualizaciones de nuevo."
+            "permission" -> "Permite que Zappy instale actualizaciones y toca Buscar actualizaciones de nuevo."
             "unavailable" -> "No encontré un APK disponible en la última release de GitHub."
             "up_to_date" -> "Ya tienes la versión más reciente ($value)."
             "already_downloaded" -> "Actualización $value ya descargada. Confirma la instalación en Android."
@@ -146,7 +146,7 @@ class UpdateChecker(
             else -> "No pude buscar actualizaciones: $value"
         }
         "ru" -> when (key) {
-            "permission" -> "Разрешите ZapTube Bot устанавливать обновления и нажмите Проверить обновления снова."
+            "permission" -> "Разрешите Zappy устанавливать обновления и нажмите Проверить обновления снова."
             "unavailable" -> "APK не найден в последнем релизе GitHub."
             "up_to_date" -> "У вас уже последняя версия ($value)."
             "already_downloaded" -> "Обновление $value уже загружено. Подтвердите установку в Android."
@@ -154,7 +154,7 @@ class UpdateChecker(
             else -> "Не удалось проверить обновления: $value"
         }
         else -> when (key) {
-            "permission" -> "Allow ZapTube Bot to install updates, then tap Check for updates again."
+            "permission" -> "Allow Zappy to install updates, then tap Check for updates again."
             "unavailable" -> "I could not find an APK in the latest GitHub release."
             "up_to_date" -> "You are already on the latest version ($value)."
             "already_downloaded" -> "Update $value already downloaded. Confirm installation in Android."
@@ -208,7 +208,7 @@ internal object UpdateApkCache {
             setProperty("apkUrl", release.apkUrl)
         }
         File(outputDir, METADATA_FILE).outputStream().use { output ->
-            properties.store(output, "ZapTube Bot update cache")
+            properties.store(output, "Zappy update cache")
         }
     }
 }

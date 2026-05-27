@@ -45,6 +45,22 @@ class BotMessagesTest {
         assertTrue(BotMessages("en").statusLabel(DownloadStatus.DOWNLOADING) == "Downloading")
     }
 
+    @Test fun relativePublishedDatesUseBotLanguage() {
+        val portugueseDateVideo = video.copy(publishedText = "há 6 anos")
+
+        assertTrue(BotMessages("en").searchResults("test", listOf(portugueseDateVideo)).contains("_Published:_ 6 years ago"))
+        assertTrue(BotMessages("es").searchResults("test", listOf(portugueseDateVideo)).contains("_Publicado:_ hace 6 años"))
+        assertTrue(BotMessages("ru").searchResults("test", listOf(portugueseDateVideo)).contains("_Опубликовано:_ 6 лет назад"))
+        assertTrue(BotMessages("pt").searchResults("test", listOf(portugueseDateVideo)).contains("_Publicado:_ há 6 anos"))
+    }
+
+    @Test fun welcomeUsesBotLanguageAndMentionsHelp() {
+        assertTrue(BotMessages("en").welcome().contains("*/help*"))
+        assertTrue(BotMessages("pt").welcome().contains("Bem-vindo ao Zappy"))
+        assertTrue(BotMessages("es").welcome().contains("Bienvenido a Zappy"))
+        assertTrue(BotMessages("ru").welcome().contains("Добро пожаловать в Zappy"))
+    }
+
     @Test fun listedLanguagesHaveBotMessageTranslations() {
         val expected = mapOf(
             "en" to listOf("Tell me what you want", "To download a video", "Video ready", "Downloading"),

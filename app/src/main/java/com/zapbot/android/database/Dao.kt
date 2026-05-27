@@ -34,6 +34,15 @@ interface ChatSearchSessionDao {
 }
 
 @Dao
+interface ChatWelcomeDao {
+    @Query("SELECT EXISTS(SELECT 1 FROM chat_welcomes WHERE chatId = :chatId)")
+    suspend fun hasWelcomed(chatId: String): Boolean
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(welcome: ChatWelcomeEntity): Long
+}
+
+@Dao
 interface DownloadJobDao {
     @Insert
     suspend fun insert(job: DownloadJobEntity): Long

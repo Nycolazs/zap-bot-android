@@ -12,7 +12,7 @@ class BotMessages(language: String) {
 
     fun help() = when (language) {
         "pt" -> """
-            🤖 *ZapTube Bot*
+            🤖 *Zappy*
 
             *Como pesquisar*
             Envie */* junto com o que você quer buscar.
@@ -46,7 +46,7 @@ class BotMessages(language: String) {
             Cancela o download atual.
         """.trimIndent()
         "es" -> """
-            🤖 *ZapTube Bot*
+            🤖 *Zappy*
 
             *Cómo buscar*
             Envía */* junto con lo que quieres buscar.
@@ -80,7 +80,7 @@ class BotMessages(language: String) {
             Cancela la descarga actual.
         """.trimIndent()
         "ru" -> """
-            🤖 *ZapTube Bot*
+            🤖 *Zappy*
 
             *Как искать*
             Отправьте */* и текст поиска.
@@ -114,7 +114,7 @@ class BotMessages(language: String) {
             Отменяет текущую загрузку.
         """.trimIndent()
         else -> """
-            🤖 *ZapTube Bot*
+            🤖 *Zappy*
 
             *How to search*
             Send */* followed by what you want to search.
@@ -146,6 +146,69 @@ class BotMessages(language: String) {
 
             */cancel*
             Cancels the current download.
+        """.trimIndent()
+    }
+
+    fun welcome() = when (language) {
+        "pt" -> """
+            👋 *Bem-vindo ao Zappy!*
+
+            Eu baixo músicas, vídeos e links para você pelo WhatsApp.
+
+            *Comandos básicos*
+            */help* — ver ajuda completa
+            */nome da música* — pesquisar no YouTube
+            */v1* — baixar o vídeo 1
+            */a1* — baixar o áudio 1
+            */status* — ver o download atual
+            */cancel* — cancelar o download atual
+
+            _Exemplo:_ */música relaxante*
+        """.trimIndent()
+        "es" -> """
+            👋 *¡Bienvenido a Zappy!*
+
+            Descargo música, videos y enlaces para ti por WhatsApp.
+
+            *Comandos básicos*
+            */help* — ver ayuda completa
+            */nombre de la canción* — buscar en YouTube
+            */v1* — descargar el video 1
+            */a1* — descargar el audio 1
+            */status* — ver la descarga actual
+            */cancel* — cancelar la descarga actual
+
+            _Ejemplo:_ */música relajante*
+        """.trimIndent()
+        "ru" -> """
+            👋 *Добро пожаловать в Zappy!*
+
+            Я скачиваю музыку, видео и ссылки для вас через WhatsApp.
+
+            *Основные команды*
+            */help* — полная помощь
+            */название песни* — поиск на YouTube
+            */v1* — скачать видео 1
+            */a1* — скачать аудио 1
+            */status* — текущая загрузка
+            */cancel* — отменить текущую загрузку
+
+            _Пример:_ */relaxing music*
+        """.trimIndent()
+        else -> """
+            👋 *Welcome to Zappy!*
+
+            I download music, videos, and links for you through WhatsApp.
+
+            *Basic commands*
+            */help* — show full help
+            */song name* — search YouTube
+            */v1* — download video 1
+            */a1* — download audio 1
+            */status* — show the current download
+            */cancel* — cancel the current download
+
+            _Example:_ */relaxing music*
         """.trimIndent()
     }
 
@@ -275,7 +338,7 @@ class BotMessages(language: String) {
             val number = index + 1
             appendLine("*$number. ${video.title}*")
             appendLine("${durationLabel()} ${video.durationText}")
-            appendLine("${publishedLabel()} ${video.publishedText ?: notAvailable()}")
+            appendLine("${publishedLabel()} ${publishedText(video.publishedText)}")
             appendLine("${channelLabel()} ${video.channel}")
             appendLine()
         }
@@ -336,10 +399,10 @@ class BotMessages(language: String) {
     }
 
     fun stickerImageRequired() = when (language) {
-        "pt" -> "🖼️ *Envie ou responda uma imagem.*\n\nUse */sticker* ou */figurinha* como legenda da imagem."
-        "es" -> "🖼️ *Envía o responde a una imagen.*\n\nUsa */sticker* o */figurinha* como texto de la imagen."
-        "ru" -> "🖼️ *Отправьте изображение или ответьте на него.*\n\nИспользуйте */sticker* или */figurinha* как подпись."
-        else -> "🖼️ *Send or reply to an image.*\n\nUse */sticker* or */figurinha* as the image caption."
+        "pt" -> "🖼️ *Envie uma imagem em uma conversa privada.*\n\nEu respondo com uma figurinha automaticamente."
+        "es" -> "🖼️ *Envía una imagen en una conversación privada.*\n\nResponderé con un sticker automáticamente."
+        "ru" -> "🖼️ *Отправьте изображение в личном чате.*\n\nЯ автоматически отвечу стикером."
+        else -> "🖼️ *Send an image in a private chat.*\n\nI will reply with a sticker automatically."
     }
 
     fun stickerFailed(reason: String) = when (language) {
@@ -386,10 +449,10 @@ class BotMessages(language: String) {
                 appendLine("${durationLabel()} ${video.durationText}")
             }
             if (!directSocial) {
-                appendLine("${publishedLabel()} ${video.publishedText?.takeIf { it.isNotBlank() } ?: notAvailable()}")
+                appendLine("${publishedLabel()} ${publishedText(video.publishedText)}")
             } else {
                 video.publishedText?.takeIf { it.isNotBlank() }?.let {
-                    appendLine("${publishedLabel()} $it")
+                    appendLine("${publishedLabel()} ${publishedText(it)}")
                 }
             }
             if (!directSocial) {
@@ -500,6 +563,48 @@ class BotMessages(language: String) {
         else -> "Not available"
     }
 
+    private fun publishedText(value: String?): String =
+        value?.takeIf { it.isNotBlank() }?.let(::localizedRelativeDate) ?: notAvailable()
+
+    private fun localizedRelativeDate(value: String): String {
+        val normalized = value.trim().lowercase()
+        portugueseRelativeDate.matchEntire(normalized)?.let { match ->
+            return relativeDate(match.groupValues[1], match.groupValues[2])
+        }
+        englishRelativeDate.matchEntire(normalized)?.let { match ->
+            return relativeDate(match.groupValues[1], match.groupValues[2])
+        }
+        spanishRelativeDate.matchEntire(normalized)?.let { match ->
+            return relativeDate(match.groupValues[1], match.groupValues[2])
+        }
+        return value
+    }
+
+    private fun relativeDate(amount: String, rawUnit: String): String {
+        val unit = rawUnit.trim().lowercase().removeSuffix("s")
+        val key = when {
+            unit.startsWith("seg") || unit.startsWith("sec") || unit.startsWith("сек") -> "second"
+            unit.startsWith("min") -> "minute"
+            unit.startsWith("hor") || unit.startsWith("hour") || unit.startsWith("час") -> "hour"
+            unit.startsWith("dia") || unit.startsWith("day") || unit.startsWith("д") -> "day"
+            unit.startsWith("sem") || unit.startsWith("week") || unit.startsWith("нед") -> "week"
+            unit.startsWith("mês") || unit.startsWith("mes") || unit.startsWith("mese") || unit.startsWith("month") || unit.startsWith("мес") -> "month"
+            unit.startsWith("ano") || unit.startsWith("year") || unit.startsWith("год") || unit.startsWith("лет") -> "year"
+            else -> return "$amount $rawUnit"
+        }
+        val singular = amount == "1" || amount == "uma" || amount == "um" || amount == "un" || amount == "una" || amount == "one"
+        val number = when (amount) {
+            "uma", "um", "un", "una", "one" -> "1"
+            else -> amount
+        }
+        return when (language) {
+            "pt" -> "há $number ${relativeUnitPt(key, singular)}"
+            "es" -> "hace $number ${relativeUnitEs(key, singular)}"
+            "ru" -> "$number ${relativeUnitRu(key, number)} назад"
+            else -> "$number ${relativeUnitEn(key, singular)} ago"
+        }
+    }
+
     private fun localizedReason(reason: String): String = when (reason) {
         "Invalid sticker image" -> when (language) {
             "pt" -> "imagem inválida para figurinha"
@@ -546,3 +651,66 @@ class BotMessages(language: String) {
 }
 
 private val DIRECT_LINK_CHANNELS = setOf("Instagram", "TikTok")
+
+private val portugueseRelativeDate = Regex("""há\s+(\d+|um|uma)\s+([a-záêç]+)""", RegexOption.IGNORE_CASE)
+private val englishRelativeDate = Regex("""(\d+|one)\s+([a-z]+)s?\s+ago""", RegexOption.IGNORE_CASE)
+private val spanishRelativeDate = Regex("""hace\s+(\d+|un|una)\s+([a-zñ]+)""", RegexOption.IGNORE_CASE)
+
+private fun relativeUnitPt(key: String, singular: Boolean): String = when (key) {
+    "second" -> if (singular) "segundo" else "segundos"
+    "minute" -> if (singular) "minuto" else "minutos"
+    "hour" -> if (singular) "hora" else "horas"
+    "day" -> if (singular) "dia" else "dias"
+    "week" -> if (singular) "semana" else "semanas"
+    "month" -> if (singular) "mês" else "meses"
+    else -> if (singular) "ano" else "anos"
+}
+
+private fun relativeUnitEs(key: String, singular: Boolean): String = when (key) {
+    "second" -> if (singular) "segundo" else "segundos"
+    "minute" -> if (singular) "minuto" else "minutos"
+    "hour" -> if (singular) "hora" else "horas"
+    "day" -> if (singular) "día" else "días"
+    "week" -> if (singular) "semana" else "semanas"
+    "month" -> if (singular) "mes" else "meses"
+    else -> if (singular) "año" else "años"
+}
+
+private fun relativeUnitEn(key: String, singular: Boolean): String = when (key) {
+    "second" -> if (singular) "second" else "seconds"
+    "minute" -> if (singular) "minute" else "minutes"
+    "hour" -> if (singular) "hour" else "hours"
+    "day" -> if (singular) "day" else "days"
+    "week" -> if (singular) "week" else "weeks"
+    "month" -> if (singular) "month" else "months"
+    else -> if (singular) "year" else "years"
+}
+
+private fun relativeUnitRu(key: String, amount: String): String {
+    val number = amount.toIntOrNull() ?: return when (key) {
+        "second" -> "секунд"
+        "minute" -> "минут"
+        "hour" -> "часов"
+        "day" -> "дней"
+        "week" -> "недель"
+        "month" -> "месяцев"
+        else -> "лет"
+    }
+    val lastTwo = number % 100
+    val last = number % 10
+    val form = when {
+        lastTwo in 11..14 -> 2
+        last == 1 -> 0
+        last in 2..4 -> 1
+        else -> 2
+    }
+    return when (key) {
+        "second" -> listOf("секунду", "секунды", "секунд")[form]
+        "minute" -> listOf("минуту", "минуты", "минут")[form]
+        "hour" -> listOf("час", "часа", "часов")[form]
+        "day" -> listOf("день", "дня", "дней")[form]
+        "week" -> listOf("неделю", "недели", "недель")[form]
+        "month" -> listOf("месяц", "месяца", "месяцев")[form]
+        else -> listOf("год", "года", "лет")[form]
+    }
+}

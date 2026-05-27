@@ -19,7 +19,7 @@ class BotNotificationManager(private val context: Context) {
     init {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "ZapTube Bot", NotificationManager.IMPORTANCE_LOW).apply {
+                NotificationChannel(CHANNEL_ID, "Zappy", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Bot runtime status and active downloads"
                 }
             )
@@ -34,11 +34,11 @@ class BotNotificationManager(private val context: Context) {
         lastError: String? = null
     ): Notification {
         val (title, text) = when {
-            state is WhatsAppConnectionState.WaitingForQr -> "ZapTube Bot" to "Connect WhatsApp"
-            state is WhatsAppConnectionState.Error -> "ZapTube Bot" to "Needs attention"
-            lastError != null -> "ZapTube Bot" to "Needs attention"
-            activeDownloads > 0 -> "ZapTube Bot" to "$activeDownloads active"
-            else -> "ZapTube Bot" to label(state)
+            state is WhatsAppConnectionState.WaitingForQr -> "Zappy" to "Connect WhatsApp"
+            state is WhatsAppConnectionState.Error -> "Zappy" to "Needs attention"
+            lastError != null -> "Zappy" to "Needs attention"
+            activeDownloads > 0 -> "Zappy" to "$activeDownloads active"
+            else -> "Zappy" to label(state)
         }
 
         return NotificationCompat.Builder(context, CHANNEL_ID)

@@ -83,7 +83,7 @@ fun AboutCard(
                         )
                     }
                     Column {
-                        Text("ZapTube Bot", style = MaterialTheme.typography.headlineSmall)
+                        Text("Zappy", style = MaterialTheme.typography.headlineSmall)
                         Text(t("subtitle"), color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }

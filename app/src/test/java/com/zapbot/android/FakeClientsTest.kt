@@ -18,7 +18,7 @@ class FakeClientsTest {
 
     @Test fun fakeDownloaderCreatesAFile() = runTest {
         val video = FakeYouTubeSearchClient().searchVideos("audio", 1).first()
-        val dir = File(System.getProperty("java.io.tmpdir"), "zapbot-test-${System.nanoTime()}")
+        val dir = File(System.getProperty("java.io.tmpdir"), "zappy-test-${System.nanoTime()}")
         val downloader = FakeMediaDownloader()
         downloader.downloadAudio(1L, video, dir, "128k").toList()
         assertTrue(downloader.resultFile(dir).file.exists())

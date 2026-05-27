@@ -9,7 +9,6 @@ class BotCommandParser {
             "/help" -> BotCommand.Help
             "/status" -> BotCommand.Status
             "/cancel" -> BotCommand.Cancel
-            "/sticker", "/figurinha" -> BotCommand.Sticker
             "/pesquisa", "/pesquisar", "/p", "/search" -> {
                 val query = parts.getOrNull(1)?.trim().orEmpty()
                 if (query.isBlank()) BotCommand.Invalid("MISSING_SEARCH_QUERY")
