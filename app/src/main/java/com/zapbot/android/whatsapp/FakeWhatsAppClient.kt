@@ -13,6 +13,7 @@ class FakeWhatsAppClient : WhatsAppClient {
     private val messages = MutableSharedFlow<IncomingWhatsAppMessage>(extraBufferCapacity = 32)
     val sentTexts = mutableListOf<String>()
     val sentMedia = mutableListOf<File>()
+    val sentStickers = mutableListOf<File>()
 
     override val connectionState: Flow<WhatsAppConnectionState> = state
     override val hasSavedSession: Flow<Boolean> = savedSession
@@ -29,6 +30,7 @@ class FakeWhatsAppClient : WhatsAppClient {
     override suspend fun clearSession() {
         sentTexts.clear()
         sentMedia.clear()
+        sentStickers.clear()
         savedSession.value = false
     }
 
@@ -50,6 +52,10 @@ class FakeWhatsAppClient : WhatsAppClient {
 
     override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) {
         sentMedia += file
+    }
+
+    override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) {
+        sentStickers += image
     }
 
     suspend fun receive(text: String, chatId: String = "chat-1", id: String = System.nanoTime().toString()) {

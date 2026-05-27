@@ -13,6 +13,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.util.Properties
 
 class UpdateChecker(
     private val context: Context,
@@ -32,9 +33,11 @@ class UpdateChecker(
                 return UpdateCheckResult.Message(message(lang, "up_to_date", release.version))
             }
 
-            val apk = withContext(Dispatchers.IO) { downloadApk(release) }
+            val cachedApk = withContext(Dispatchers.IO) { UpdateApkCache.cachedApk(context.cacheDir, release) }
+            val apk = cachedApk ?: withContext(Dispatchers.IO) { downloadApk(release) }
             withContext(Dispatchers.Main) { openInstaller(apk) }
-            UpdateCheckResult.Message(message(lang, "downloaded", release.version))
+            val messageKey = if (cachedApk != null) "already_downloaded" else "ready"
+            UpdateCheckResult.Message(message(lang, messageKey, release.version))
         }.getOrElse {
             UpdateCheckResult.Message(message(lang, "error", it.message ?: it.javaClass.simpleName))
         }
@@ -69,9 +72,10 @@ class UpdateChecker(
     }
 
     private fun downloadApk(release: ReleaseInfo): File {
-        val outputDir = File(context.cacheDir, "updates").apply { mkdirs() }
-        outputDir.listFiles()?.forEach { it.deleteRecursively() }
+        val outputDir = UpdateApkCache.outputDir(context.cacheDir).apply { mkdirs() }
         val output = File(outputDir, release.apkName)
+        val tempOutput = File(outputDir, "${release.apkName}.download")
+        tempOutput.delete()
         val request = Request.Builder()
             .url(release.apkUrl)
             .header("User-Agent", "ZapTube-Bot-Android")
@@ -79,11 +83,20 @@ class UpdateChecker(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("Download returned HTTP ${response.code}")
             val body = response.body ?: error("Download body was empty")
-            output.outputStream().use { file ->
+            tempOutput.outputStream().use { file ->
                 body.byteStream().use { input -> input.copyTo(file) }
             }
         }
+        if (tempOutput.length() <= 0L) error("Downloaded APK is empty")
+        outputDir.listFiles()?.forEach { file ->
+            if (file != tempOutput) file.deleteRecursively()
+        }
+        if (!tempOutput.renameTo(output)) {
+            tempOutput.copyTo(output, overwrite = true)
+            tempOutput.delete()
+        }
         if (output.length() <= 0L) error("Downloaded APK is empty")
+        UpdateApkCache.writeMetadata(context.cacheDir, release)
         return output
     }
 
@@ -120,33 +133,37 @@ class UpdateChecker(
             "permission" -> "Permita que o ZapTube Bot instale atualizações e toque em Verificar atualizações novamente."
             "unavailable" -> "Não encontrei um APK disponível na última release do GitHub."
             "up_to_date" -> "Você já está na versão mais recente ($value)."
-            "downloaded" -> "Atualização $value baixada. Confirme a instalação na tela do Android."
+            "already_downloaded" -> "Atualização $value já baixada. Confirme a instalação no Android."
+            "ready" -> "Atualização $value pronta. Confirme a instalação na tela do Android."
             else -> "Não consegui verificar atualizações: $value"
         }
         "es" -> when (key) {
             "permission" -> "Permite que ZapTube Bot instale actualizaciones y toca Buscar actualizaciones de nuevo."
             "unavailable" -> "No encontré un APK disponible en la última release de GitHub."
             "up_to_date" -> "Ya tienes la versión más reciente ($value)."
-            "downloaded" -> "Actualización $value descargada. Confirma la instalación en Android."
+            "already_downloaded" -> "Actualización $value ya descargada. Confirma la instalación en Android."
+            "ready" -> "Actualización $value lista. Confirma la instalación en Android."
             else -> "No pude buscar actualizaciones: $value"
         }
         "ru" -> when (key) {
             "permission" -> "Разрешите ZapTube Bot устанавливать обновления и нажмите Проверить обновления снова."
             "unavailable" -> "APK не найден в последнем релизе GitHub."
             "up_to_date" -> "У вас уже последняя версия ($value)."
-            "downloaded" -> "Обновление $value загружено. Подтвердите установку в Android."
+            "already_downloaded" -> "Обновление $value уже загружено. Подтвердите установку в Android."
+            "ready" -> "Обновление $value готово. Подтвердите установку в Android."
             else -> "Не удалось проверить обновления: $value"
         }
         else -> when (key) {
             "permission" -> "Allow ZapTube Bot to install updates, then tap Check for updates again."
             "unavailable" -> "I could not find an APK in the latest GitHub release."
             "up_to_date" -> "You are already on the latest version ($value)."
-            "downloaded" -> "Update $value downloaded. Confirm installation in Android."
+            "already_downloaded" -> "Update $value already downloaded. Confirm installation in Android."
+            "ready" -> "Update $value ready. Confirm installation in Android."
             else -> "Could not check for updates: $value"
         }
     }
 
-    private data class ReleaseInfo(
+    internal data class ReleaseInfo(
         val version: String,
         val tag: String,
         val apkName: String,
@@ -155,6 +172,44 @@ class UpdateChecker(
 
     private companion object {
         const val GITHUB_LATEST_RELEASE = "https://api.github.com/repos/Nycolazs/zap-bot-android/releases/latest"
+    }
+}
+
+internal object UpdateApkCache {
+    private const val METADATA_FILE = "latest-release.properties"
+
+    fun outputDir(cacheDir: File): File = File(cacheDir, "updates")
+
+    fun cachedApk(cacheDir: File, release: UpdateChecker.ReleaseInfo): File? {
+        val outputDir = outputDir(cacheDir)
+        val apk = File(outputDir, release.apkName)
+        if (!apk.isFile || apk.length() <= 0L) return null
+
+        val metadata = File(outputDir, METADATA_FILE)
+        if (!metadata.isFile) return null
+
+        return runCatching {
+            val properties = Properties()
+            metadata.inputStream().use { properties.load(it) }
+            val matchesRelease = properties.getProperty("tag") == release.tag &&
+                properties.getProperty("version") == release.version &&
+                properties.getProperty("apkName") == release.apkName &&
+                properties.getProperty("apkUrl") == release.apkUrl
+            if (matchesRelease) apk else null
+        }.getOrNull()
+    }
+
+    fun writeMetadata(cacheDir: File, release: UpdateChecker.ReleaseInfo) {
+        val outputDir = outputDir(cacheDir).apply { mkdirs() }
+        val properties = Properties().apply {
+            setProperty("tag", release.tag)
+            setProperty("version", release.version)
+            setProperty("apkName", release.apkName)
+            setProperty("apkUrl", release.apkUrl)
+        }
+        File(outputDir, METADATA_FILE).outputStream().use { output ->
+            properties.store(output, "ZapTube Bot update cache")
+        }
     }
 }
 

@@ -2,6 +2,8 @@ package com.zapbot.android.downloader
 
 import android.content.Context
 import com.zapbot.android.domain.DownloadResult
+import com.zapbot.android.domain.MediaUrl
+import com.zapbot.android.domain.MediaUrlParser
 import com.zapbot.android.domain.YouTubeVideoResult
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
@@ -30,13 +32,21 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         clearOutput(outputDir)
         emit(DownloadProgress(0, "Preparando download"))
         val height = (qualityLimit.filter(Char::isDigit).toIntOrNull() ?: 360).coerceAtMost(SAFE_VIDEO_HEIGHT)
+        val mediaUrl = MediaUrlParser.parse(video.url)
         val request = baseRequest(video.url, outputDir).apply {
-            addOption(
-                "-f",
-                "best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]+bestaudio[ext=m4a]/bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]"
-            )
-            addOption("--merge-output-format", "mp4")
-            addOption("-S", "res:$height,hasaud,ext:mp4:m4a,+size")
+            if (mediaUrl?.source == MediaUrl.Source.INSTAGRAM || mediaUrl?.source == MediaUrl.Source.TIKTOK) {
+                addOption("-f", "bestvideo*+bestaudio/best")
+                addOption("--merge-output-format", "mp4")
+                addOption("--remux-video", "mp4")
+                addOption("-S", "hasaud,ext:mp4:m4a,+size")
+            } else {
+                addOption(
+                    "-f",
+                    "best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[height<=$height][ext=mp4][vcodec!=none][acodec!=none][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/worst[ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=$height][ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]+bestaudio[ext=m4a]/bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]"
+                )
+                addOption("--merge-output-format", "mp4")
+                addOption("-S", "res:$height,hasaud,ext:mp4:m4a,+size")
+            }
         }
         emit(DownloadProgress(5, "Baixando vídeo"))
         executeAndValidate(request, processId(jobId), outputDir)
@@ -90,7 +100,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
     }
 
     override suspend fun resultFile(outputDir: File): DownloadResult = withContext(Dispatchers.IO) {
-        val file = outputDir.listFiles()
+        val file = outputDir.walkTopDown()
             ?.filter { it.isFile && it.length() > 0L && !it.name.endsWith(".part") && it.extension.lowercase() in MEDIA_EXTENSIONS }
             ?.maxByOrNull { it.lastModified() }
             ?: error("Arquivo baixado não encontrado")
@@ -106,6 +116,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
 
     private fun baseRequest(url: String, outputDir: File, noPlaylist: Boolean = true): YoutubeDLRequest =
         YoutubeDLRequest(url).apply {
+            val mediaUrl = MediaUrlParser.parse(url)
             if (noPlaylist) addOption("--no-playlist")
             addOption("--newline")
             addOption("--no-mtime")
@@ -114,9 +125,21 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             addOption("--concurrent-fragments", "8")
             addOption("--retries", "3")
             addOption("--fragment-retries", "3")
-            addOption("--extractor-args", "youtube:player_client=android,ios,web")
-            addOption("--user-agent", YOUTUBE_USER_AGENT)
-            addOption("--referer", "https://www.youtube.com/")
+            when (mediaUrl?.source) {
+                MediaUrl.Source.INSTAGRAM -> {
+                    addOption("--user-agent", MOBILE_USER_AGENT)
+                    addOption("--referer", "https://www.instagram.com/")
+                }
+                MediaUrl.Source.TIKTOK -> {
+                    addOption("--user-agent", MOBILE_USER_AGENT)
+                    addOption("--referer", "https://www.tiktok.com/")
+                }
+                else -> {
+                    addOption("--extractor-args", "youtube:player_client=android,ios,web")
+                    addOption("--user-agent", YOUTUBE_USER_AGENT)
+                    addOption("--referer", "https://www.youtube.com/")
+                }
+            }
             addOption("--restrict-filenames")
             addOption("-o", File(outputDir, "%(title).80B.%(ext)s").absolutePath)
         }
@@ -137,7 +160,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         try {
             validateResponse(execute(request, processId), outputDir)
         } catch (t: YoutubeDLException) {
-            if (hasDownloadedFile(outputDir) || t.isOnlyOldVersionWarning()) return
+            if (hasDownloadedFile(outputDir)) return
             throw t
         }
     }
@@ -169,12 +192,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
     }
 
     private fun hasDownloadedFile(outputDir: File): Boolean =
-        outputDir.listFiles()?.any { it.isFile && it.length() > 0L && !it.name.endsWith(".part") } == true
-
-    private fun Throwable.isOnlyOldVersionWarning(): Boolean {
-        val message = (message ?: "").withoutYtDlpWarnings()
-        return message.isBlank()
-    }
+        outputDir.walkTopDown().any { it.isFile && it.length() > 0L && !it.name.endsWith(".part") && it.extension.lowercase() in MEDIA_EXTENSIONS }
 
     private fun String.withoutYtDlpWarnings(): String =
         lineSequence()
@@ -194,6 +212,8 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         "mp3" -> "audio/mpeg"
         "opus", "ogg" -> "audio/ogg"
         "webm" -> "video/webm"
+        "mov" -> "video/quicktime"
+        "mkv" -> "video/x-matroska"
         "zip" -> "application/zip"
         else -> "application/octet-stream"
     }
@@ -203,8 +223,10 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         const val SAFE_VIDEO_UPLOAD_BYTES = 1536L * 1024L * 1024L
         const val MAX_PLAYLIST_ITEMS = 50
         val AUDIO_EXTENSIONS = setOf("m4a", "mp4a", "mp3", "opus", "ogg")
-        val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm", "zip")
+        val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm", "mov", "mkv", "zip")
         const val YOUTUBE_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36"
+        const val MOBILE_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36"
     }
 }

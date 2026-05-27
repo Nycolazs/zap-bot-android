@@ -9,6 +9,7 @@ class BotCommandParser {
             "/help" -> BotCommand.Help
             "/status" -> BotCommand.Status
             "/cancel" -> BotCommand.Cancel
+            "/sticker", "/figurinha" -> BotCommand.Sticker
             "/pesquisa", "/pesquisar", "/p", "/search" -> {
                 val query = parts.getOrNull(1)?.trim().orEmpty()
                 if (query.isBlank()) BotCommand.Invalid("MISSING_SEARCH_QUERY")
@@ -31,8 +32,9 @@ class BotCommandParser {
 
     private fun parseDownloadArgument(raw: String?, video: Boolean): BotCommand {
         val argument = raw?.trim().orEmpty()
-        val link = YouTubeUrlParser.parse(argument)
+        val link = MediaUrlParser.parse(argument)
         if (link != null) {
+            if (!video && !link.supportsAudio) return BotCommand.Invalid("SOCIAL_AUDIO_NOT_SUPPORTED")
             return if (video) BotCommand.DownloadVideoLink(link.originalUrl) else BotCommand.DownloadAudioLink(link.originalUrl)
         }
         if (argument.startsWith("http://", ignoreCase = true) || argument.startsWith("https://", ignoreCase = true)) {

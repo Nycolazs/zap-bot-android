@@ -1,6 +1,15 @@
-# ZapTube Bot v1.4.3
+# ZapTube Bot v1.4.4
 
 ## What's New
+
+- Added public Instagram and TikTok video URL downloads through `/v <url>`.
+- Added automatic private-chat image-to-sticker conversion, disabled in groups.
+- Improved sticker conversion so image proportions are preserved.
+- Fixed repeated update downloads by reusing the already downloaded APK.
+- Updated bot messages so user-facing bot replies follow the selected bot-message language.
+- Added MIT license and README support links.
+
+## Previous v1.4.3 Highlights
 
 - Added a WhatsApp Blocklist in Settings with a modern add/remove number interface.
 - Blocklisted numbers are ignored by the bot without disconnecting WhatsApp.

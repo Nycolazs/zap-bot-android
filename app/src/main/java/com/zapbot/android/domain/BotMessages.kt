@@ -28,9 +28,16 @@ class BotMessages(language: String) {
             *Links diretos*
             🎧 */a https://youtu.be/exemplo* — baixa MP3
             🎬 */v https://youtu.be/exemplo* — baixa vídeo
+            🎬 */v https://www.instagram.com/reel/...* — baixa vídeo do Instagram
+            🎬 */v https://www.tiktok.com/@user/video/...* — baixa vídeo do TikTok
             🎵 */a link-da-playlist* — envia os MP3 em um .zip
 
             ⚠️ Playlists funcionam apenas com */a*.
+            ⚠️ Instagram e TikTok funcionam apenas com */v*.
+
+            *Figurinhas*
+            Envie uma imagem em conversa privada e eu respondo com uma figurinha automaticamente.
+            Grupos são ignorados para figurinhas.
 
             */status*
             Mostra o andamento do download atual.
@@ -55,9 +62,16 @@ class BotMessages(language: String) {
             *Enlaces directos*
             🎧 */a https://youtu.be/ejemplo* — descarga MP3
             🎬 */v https://youtu.be/ejemplo* — descarga video
+            🎬 */v https://www.instagram.com/reel/...* — descarga video de Instagram
+            🎬 */v https://www.tiktok.com/@user/video/...* — descarga video de TikTok
             🎵 */a enlace-de-playlist* — envía los MP3 en un .zip
 
             ⚠️ Las playlists solo funcionan con */a*.
+            ⚠️ Instagram y TikTok solo funcionan con */v*.
+
+            *Stickers*
+            Envía una imagen en una conversación privada y responderé con un sticker automáticamente.
+            Los grupos se ignoran para stickers.
 
             */status*
             Muestra el progreso de la descarga actual.
@@ -82,9 +96,16 @@ class BotMessages(language: String) {
             *Прямые ссылки*
             🎧 */a https://youtu.be/example* — скачать MP3
             🎬 */v https://youtu.be/example* — скачать видео
+            🎬 */v https://www.instagram.com/reel/...* — скачать видео из Instagram
+            🎬 */v https://www.tiktok.com/@user/video/...* — скачать видео из TikTok
             🎵 */a ссылка-на-плейлист* — отправить MP3 в .zip
 
             ⚠️ Плейлисты работают только с */a*.
+            ⚠️ Instagram и TikTok работают только с */v*.
+
+            *Стикеры*
+            Отправьте изображение в личном чате, и я автоматически отвечу стикером.
+            В группах стикеры игнорируются.
 
             */status*
             Показывает текущую загрузку.
@@ -109,9 +130,16 @@ class BotMessages(language: String) {
             *Direct links*
             🎧 */a https://youtu.be/example* — download MP3
             🎬 */v https://youtu.be/example* — download video
+            🎬 */v https://www.instagram.com/reel/...* — download Instagram video
+            🎬 */v https://www.tiktok.com/@user/video/...* — download TikTok video
             🎵 */a playlist-link* — send MP3 files in a .zip
 
             ⚠️ Playlists work only with */a*.
+            ⚠️ Instagram and TikTok work only with */v*.
+
+            *Stickers*
+            Send an image in a private chat and I will reply with a sticker automatically.
+            Groups are ignored for stickers.
 
             */status*
             Shows the current download progress.
@@ -171,7 +199,41 @@ class BotMessages(language: String) {
             "ru" -> "Загрузка началась"
             else -> "Download started"
         }
-        return "$icon *$title*\n\n*${video.title}*\n⏱️ ${video.durationText}\n📺 ${video.channel}"
+        return buildString {
+            appendLine("$icon *$title*")
+            appendLine()
+            appendLine("*${video.title}*")
+            val directSocial = video.channel in DIRECT_LINK_CHANNELS
+            if (video.durationSeconds > 0L || !directSocial) appendLine("⏱️ ${video.durationText}")
+            if (!directSocial) appendLine("📺 ${video.channel}")
+        }.trimEnd()
+    }
+
+    fun directLinkTitle(source: MediaUrl.Source, isPlaylist: Boolean): String = when (language) {
+        "pt" -> when {
+            isPlaylist -> "Playlist do YouTube"
+            source == MediaUrl.Source.INSTAGRAM -> "Vídeo do Instagram"
+            source == MediaUrl.Source.TIKTOK -> "Vídeo do TikTok"
+            else -> "Link do YouTube"
+        }
+        "es" -> when {
+            isPlaylist -> "Playlist de YouTube"
+            source == MediaUrl.Source.INSTAGRAM -> "Video de Instagram"
+            source == MediaUrl.Source.TIKTOK -> "Video de TikTok"
+            else -> "Enlace de YouTube"
+        }
+        "ru" -> when {
+            isPlaylist -> "Плейлист YouTube"
+            source == MediaUrl.Source.INSTAGRAM -> "Видео Instagram"
+            source == MediaUrl.Source.TIKTOK -> "Видео TikTok"
+            else -> "Ссылка YouTube"
+        }
+        else -> when {
+            isPlaylist -> "YouTube playlist"
+            source == MediaUrl.Source.INSTAGRAM -> "Instagram video"
+            source == MediaUrl.Source.TIKTOK -> "TikTok video"
+            else -> "YouTube link"
+        }
     }
 
     fun statusIdle() = when (language) {
@@ -253,10 +315,10 @@ class BotMessages(language: String) {
     }
 
     fun invalidYouTubeLink() = when (language) {
-        "pt" -> "🔗 *Link inválido*\n\nUse um link de vídeo ou playlist do YouTube.\n\n_Exemplos:_\n*/a https://youtu.be/exemplo*\n*/v https://youtu.be/exemplo*"
-        "es" -> "🔗 *Enlace inválido*\n\nUsa un enlace de video o playlist de YouTube.\n\n_Ejemplos:_\n*/a https://youtu.be/ejemplo*\n*/v https://youtu.be/ejemplo*"
-        "ru" -> "🔗 *Неверная ссылка*\n\nИспользуйте ссылку на видео или плейлист YouTube.\n\n_Примеры:_\n*/a https://youtu.be/example*\n*/v https://youtu.be/example*"
-        else -> "🔗 *Invalid link*\n\nUse a YouTube video or playlist link.\n\n_Examples:_\n*/a https://youtu.be/example*\n*/v https://youtu.be/example*"
+        "pt" -> "🔗 *Link inválido*\n\nUse um link público do YouTube, Instagram ou TikTok.\n\n_Exemplos:_\n*/a https://youtu.be/exemplo*\n*/v https://www.instagram.com/reel/...*\n*/v https://www.tiktok.com/@user/video/...*"
+        "es" -> "🔗 *Enlace inválido*\n\nUsa un enlace público de YouTube, Instagram o TikTok.\n\n_Ejemplos:_\n*/a https://youtu.be/ejemplo*\n*/v https://www.instagram.com/reel/...*\n*/v https://www.tiktok.com/@user/video/...*"
+        "ru" -> "🔗 *Неверная ссылка*\n\nИспользуйте публичную ссылку YouTube, Instagram или TikTok.\n\n_Примеры:_\n*/a https://youtu.be/example*\n*/v https://www.instagram.com/reel/...*\n*/v https://www.tiktok.com/@user/video/...*"
+        else -> "🔗 *Invalid link*\n\nUse a public YouTube, Instagram, or TikTok link.\n\n_Examples:_\n*/a https://youtu.be/example*\n*/v https://www.instagram.com/reel/...*\n*/v https://www.tiktok.com/@user/video/...*"
     }
 
     fun playlistVideoNotSupported() = when (language) {
@@ -264,6 +326,27 @@ class BotMessages(language: String) {
         "es" -> "🎵 *Las playlists solo son compatibles con audio.*\n\nUsa */a* con el enlace de la playlist para recibir los MP3 en un archivo .zip."
         "ru" -> "🎵 *Плейлисты поддерживаются только для аудио.*\n\nИспользуйте */a* со ссылкой на плейлист, чтобы получить MP3 в .zip."
         else -> "🎵 *Playlists are supported for audio only.*\n\nUse */a* with the playlist link to receive the MP3 files in a .zip."
+    }
+
+    fun socialAudioNotSupported() = when (language) {
+        "pt" -> "🎬 *Instagram e TikTok só são suportados como vídeo.*\n\nUse */v* com o link público."
+        "es" -> "🎬 *Instagram y TikTok solo son compatibles como video.*\n\nUsa */v* con el enlace público."
+        "ru" -> "🎬 *Instagram и TikTok поддерживаются только как видео.*\n\nИспользуйте */v* с публичной ссылкой."
+        else -> "🎬 *Instagram and TikTok are supported as video only.*\n\nUse */v* with the public link."
+    }
+
+    fun stickerImageRequired() = when (language) {
+        "pt" -> "🖼️ *Envie ou responda uma imagem.*\n\nUse */sticker* ou */figurinha* como legenda da imagem."
+        "es" -> "🖼️ *Envía o responde a una imagen.*\n\nUsa */sticker* o */figurinha* como texto de la imagen."
+        "ru" -> "🖼️ *Отправьте изображение или ответьте на него.*\n\nИспользуйте */sticker* или */figurinha* как подпись."
+        else -> "🖼️ *Send or reply to an image.*\n\nUse */sticker* or */figurinha* as the image caption."
+    }
+
+    fun stickerFailed(reason: String) = when (language) {
+        "pt" -> "⚠️ *Não consegui criar a figurinha.*\n\n_Motivo:_ ${localizedReason(reason)}"
+        "es" -> "⚠️ *No pude crear el sticker.*\n\n_Motivo:_ ${localizedReason(reason)}"
+        "ru" -> "⚠️ *Не удалось создать стикер.*\n\n_Причина:_ ${localizedReason(reason)}"
+        else -> "⚠️ *I could not create the sticker.*\n\n_Reason:_ ${localizedReason(reason)}"
     }
 
     fun completedCaption(video: YouTubeVideoResult, type: DownloadType, isPlaylist: Boolean): String {
@@ -294,14 +377,25 @@ class BotMessages(language: String) {
                 else -> "Audio ready"
             }
         }
-        return """
-            $icon *$label*
-
-            *${video.title}*
-            ${durationLabel()} ${video.durationText}
-            ${publishedLabel()} ${video.publishedText ?: notAvailable()}
-            ${channelLabel()} ${video.channel}
-        """.trimIndent()
+        return buildString {
+            appendLine("$icon *$label*")
+            appendLine()
+            appendLine("*${video.title}*")
+            val directSocial = video.channel in DIRECT_LINK_CHANNELS
+            if (video.durationSeconds > 0L || !directSocial) {
+                appendLine("${durationLabel()} ${video.durationText}")
+            }
+            if (!directSocial) {
+                appendLine("${publishedLabel()} ${video.publishedText?.takeIf { it.isNotBlank() } ?: notAvailable()}")
+            } else {
+                video.publishedText?.takeIf { it.isNotBlank() }?.let {
+                    appendLine("${publishedLabel()} $it")
+                }
+            }
+            if (!directSocial) {
+                appendLine("${channelLabel()} ${video.channel}")
+            }
+        }.trimEnd()
     }
 
     fun statusLabel(status: DownloadStatus): String = when (language) {
@@ -406,6 +500,22 @@ class BotMessages(language: String) {
         else -> "Not available"
     }
 
+    private fun localizedReason(reason: String): String = when (reason) {
+        "Invalid sticker image" -> when (language) {
+            "pt" -> "imagem inválida para figurinha"
+            "es" -> "imagen inválida para sticker"
+            "ru" -> "недопустимое изображение для стикера"
+            else -> reason
+        }
+        "Sticker conversion failed" -> when (language) {
+            "pt" -> "falha ao converter a figurinha"
+            "es" -> "falló la conversión del sticker"
+            "ru" -> "не удалось преобразовать стикер"
+            else -> reason
+        }
+        else -> reason
+    }
+
     private fun downloadInstructionsTitle() = when (language) {
         "pt" -> "✨ *Como baixar*"
         "es" -> "✨ *Cómo descargar*"
@@ -434,3 +544,5 @@ class BotMessages(language: String) {
         else -> "_Tip:_ if you reply to this message with */v1* or */a1*, I use this search even if there is a newer one."
     }
 }
+
+private val DIRECT_LINK_CHANNELS = setOf("Instagram", "TikTok")

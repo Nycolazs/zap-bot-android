@@ -44,4 +44,8 @@ class QrBridgeWhatsAppClient : WhatsAppClient {
     override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) {
         error("WhatsApp QR bridge is not configured")
     }
+
+    override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) {
+        error("WhatsApp QR bridge is not configured")
+    }
 }

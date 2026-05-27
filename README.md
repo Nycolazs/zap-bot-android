@@ -35,8 +35,8 @@ Download the latest APK from GitHub Releases:
 
 Current app version:
 
-- `versionName`: `1.4.3`
-- `versionCode`: `8`
+- `versionName`: `1.4.4`
+- `versionCode`: `9`
 - `minSdk`: `26`
 - `targetSdk`: `35`
 
@@ -66,10 +66,16 @@ For best reliability, open Android battery settings for the app and disable batt
 | `/a1` | Downloads and sends audio result 1. |
 | `/v` | Downloads result 1, especially useful as a reply to a search message. |
 | `/a` | Downloads audio result 1, especially useful as a reply. |
+| `/v https://www.instagram.com/reel/...` | Downloads and sends an Instagram video. |
+| `/v https://www.tiktok.com/@user/video/...` | Downloads and sends a TikTok video. |
+| `/sticker` | Creates a sticker from an image sent with this caption. |
+| `/figurinha` | Same as `/sticker`. |
 | `/status` | Shows the active download status for that chat. |
 | `/cancel` | Cancels the active job for that chat. |
 
 When replying to an older search result message with `/v1` or `/a1`, the bot uses the replied search results instead of the latest search in the chat.
+
+Instagram and TikTok direct links are video-only and should use `/v`. YouTube links can use `/v` for video or `/a` for audio.
 
 ## 🌍 Languages
 
@@ -175,6 +181,21 @@ The app requests permissions needed for a long-running bot:
 - Usage guide: [docs/USAGE.md](docs/USAGE.md)
 - Architecture notes: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Testing notes: [TESTING.md](TESTING.md)
+
+## 🐞 Error or Bug
+
+If you find an error or bug, open a GitHub issue with:
+
+- App version.
+- Android version and device model.
+- The WhatsApp command or action that triggered the issue.
+- Relevant app logs or screenshots, with private chat data removed.
+
+Issues: https://github.com/Nycolazs/zap-bot-android/issues
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## 🧪 Current Status
 

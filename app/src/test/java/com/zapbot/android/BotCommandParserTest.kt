@@ -46,6 +46,23 @@ class BotCommandParserTest {
         assertEquals(BotCommand.DownloadVideoLink("https://www.youtube.com/playlist?list=PL1234567890"), parser.parse("/v https://www.youtube.com/playlist?list=PL1234567890"))
     }
 
+    @Test fun parsesDirectInstagramAndTikTokVideoLinks() {
+        assertEquals(BotCommand.DownloadVideoLink("https://www.instagram.com/reel/ABC123/"), parser.parse("/v https://www.instagram.com/reel/ABC123/"))
+        assertEquals(BotCommand.DownloadVideoLink("https://www.instagram.com/p/ABC123/"), parser.parse("/v https://www.instagram.com/p/ABC123/"))
+        assertEquals(BotCommand.DownloadVideoLink("https://www.tiktok.com/@user/video/1234567890"), parser.parse("/v https://www.tiktok.com/@user/video/1234567890"))
+        assertEquals(BotCommand.DownloadVideoLink("https://vm.tiktok.com/ZMabc123/"), parser.parse("/v https://vm.tiktok.com/ZMabc123/"))
+    }
+
+    @Test fun rejectsInstagramAndTikTokAudioLinks() {
+        assertEquals(BotCommand.Invalid("SOCIAL_AUDIO_NOT_SUPPORTED"), parser.parse("/a https://www.instagram.com/reel/ABC123/"))
+        assertEquals(BotCommand.Invalid("SOCIAL_AUDIO_NOT_SUPPORTED"), parser.parse("/a https://www.tiktok.com/@user/video/1234567890"))
+    }
+
+    @Test fun parsesStickerCommands() {
+        assertEquals(BotCommand.Sticker, parser.parse("/sticker"))
+        assertEquals(BotCommand.Sticker, parser.parse("/figurinha"))
+    }
+
     @Test fun rejectsBadIndex() {
         assertTrue(parser.parse("/v x") is BotCommand.Invalid)
         assertTrue(parser.parse("/a 0") is BotCommand.Invalid)

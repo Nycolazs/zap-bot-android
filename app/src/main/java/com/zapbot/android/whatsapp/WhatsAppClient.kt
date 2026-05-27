@@ -17,4 +17,5 @@ interface WhatsAppClient {
     suspend fun sendText(chatId: String, text: String, replyToMessageId: String? = null): String?
     suspend fun sendTextToGroupName(groupName: String, text: String): String?
     suspend fun sendMedia(chatId: String, file: File, caption: String? = null, replyToMessageId: String? = null)
+    suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String? = null)
 }

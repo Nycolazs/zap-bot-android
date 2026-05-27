@@ -27,6 +27,7 @@ data class YouTubeVideoResult(
 enum class DownloadType { VIDEO, AUDIO }
 enum class DownloadStatus { QUEUED, DOWNLOADING, PROCESSING, SENDING, COMPLETED, FAILED, CANCELLED }
 enum class LogLevel { DEBUG, INFO, WARN, ERROR }
+enum class IncomingMediaType { IMAGE }
 
 sealed interface BotCommand {
     data object Help : BotCommand
@@ -35,6 +36,7 @@ sealed interface BotCommand {
     data class DownloadAudio(val index: Int) : BotCommand
     data class DownloadVideoLink(val url: String) : BotCommand
     data class DownloadAudioLink(val url: String) : BotCommand
+    data object Sticker : BotCommand
     data object Status : BotCommand
     data object Cancel : BotCommand
     data class Invalid(val reason: String) : BotCommand
@@ -48,7 +50,16 @@ data class IncomingWhatsAppMessage(
     val text: String,
     val quotedMessageId: String?,
     val quotedText: String?,
-    val timestamp: Long
+    val timestamp: Long,
+    val media: IncomingWhatsAppMedia? = null,
+    val quotedMedia: IncomingWhatsAppMedia? = null
+)
+
+data class IncomingWhatsAppMedia(
+    val type: IncomingMediaType,
+    val file: File,
+    val mimeType: String?,
+    val fileName: String?
 )
 
 sealed interface WhatsAppConnectionState {

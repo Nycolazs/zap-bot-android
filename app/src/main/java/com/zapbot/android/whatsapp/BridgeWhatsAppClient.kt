@@ -1,6 +1,8 @@
 package com.zapbot.android.whatsapp
 
 import com.squareup.moshi.Moshi
+import com.zapbot.android.domain.IncomingMediaType
+import com.zapbot.android.domain.IncomingWhatsAppMedia
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
 import kotlinx.coroutines.CoroutineScope
@@ -74,7 +76,9 @@ class BridgeWhatsAppClient(
                                     text = it.text,
                                     quotedMessageId = null,
                                     quotedText = null,
-                                    timestamp = it.timestamp
+                                    timestamp = it.timestamp,
+                                    media = it.toMedia(),
+                                    quotedMedia = it.toQuotedMedia()
                                 )
                             )
                         }
@@ -117,6 +121,10 @@ class BridgeWhatsAppClient(
         error("Envio de media via bridge ainda precisa de upload multipart")
     }
 
+    override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) {
+        error("Envio de figurinha via bridge HTTP ainda precisa de upload multipart")
+    }
+
     private fun BridgeStateResponse.toConnectionState(): WhatsAppConnectionState = when (status) {
         "waiting_qr" -> WhatsAppConnectionState.WaitingForQr(qrData.orEmpty())
         "connecting" -> WhatsAppConnectionState.Connecting
@@ -131,6 +139,34 @@ class BridgeWhatsAppClient(
 
     private fun safeError(t: Throwable): String =
         (t.message ?: t.javaClass.simpleName).replace(Regex("[\\r\\n]+"), " ").take(160)
+}
+
+private fun BridgeMessage.toMedia(): IncomingWhatsAppMedia? {
+    val path = mediaPath?.takeIf { it.isNotBlank() } ?: return null
+    val type = when (mediaType) {
+        "image", null, "" -> IncomingMediaType.IMAGE
+        else -> return null
+    }
+    return IncomingWhatsAppMedia(
+        type = type,
+        file = File(path),
+        mimeType = mediaMime?.takeIf { it.isNotBlank() } ?: "application/octet-stream",
+        fileName = mediaFileName
+    )
+}
+
+private fun BridgeMessage.toQuotedMedia(): IncomingWhatsAppMedia? {
+    val path = quotedMediaPath?.takeIf { it.isNotBlank() } ?: return null
+    val type = when (quotedMediaType?.lowercase()) {
+        null, "", "image" -> IncomingMediaType.IMAGE
+        else -> return null
+    }
+    return IncomingWhatsAppMedia(
+        type = type,
+        file = File(path),
+        mimeType = quotedMediaMime?.takeIf { it.isNotBlank() } ?: "application/octet-stream",
+        fileName = quotedMediaFileName
+    )
 }
 
 private interface BridgeApi {
@@ -172,5 +208,13 @@ private data class BridgeMessage(
     val chatId: String,
     val senderName: String?,
     val text: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val mediaType: String? = null,
+    val mediaPath: String? = null,
+    val mediaMime: String? = null,
+    val mediaFileName: String? = null,
+    val quotedMediaType: String? = null,
+    val quotedMediaPath: String? = null,
+    val quotedMediaMime: String? = null,
+    val quotedMediaFileName: String? = null
 )

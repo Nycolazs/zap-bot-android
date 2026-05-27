@@ -33,6 +33,10 @@ class BotEngine(
             return
         }
         val text = BotMessages(currentSettings.botLanguage)
+        if (message.hasIncomingImage() && !message.isGroupChat()) {
+            sendSticker(message, text)
+            return
+        }
         when (val command = parser.parse(message.text)) {
             BotCommand.Help -> whatsapp.sendText(message.chatId, text.help(), message.id)
             is BotCommand.Search -> search(message, command.query, text)
@@ -40,6 +44,7 @@ class BotEngine(
             is BotCommand.DownloadAudio -> enqueue(message, command.index, DownloadType.AUDIO, text)
             is BotCommand.DownloadVideoLink -> enqueueLink(message, command.url, DownloadType.VIDEO, text)
             is BotCommand.DownloadAudioLink -> enqueueLink(message, command.url, DownloadType.AUDIO, text)
+            BotCommand.Sticker -> sendSticker(message, text)
             BotCommand.Status -> status(message, text)
             BotCommand.Cancel -> cancel(message, text)
             is BotCommand.Invalid -> whatsapp.sendText(message.chatId, localizedInvalid(command.reason, text), message.id)
@@ -113,21 +118,30 @@ class BotEngine(
     }
 
     private suspend fun enqueueLink(message: IncomingWhatsAppMessage, url: String, type: DownloadType, text: BotMessages) {
-        val parsed = YouTubeUrlParser.parse(url)
+        val parsed = MediaUrlParser.parse(url)
         if (parsed == null) {
             whatsapp.sendText(message.chatId, text.invalidYouTubeLink(), message.id)
             return
         }
-        if (parsed.kind == YouTubeUrl.Kind.PLAYLIST && type == DownloadType.VIDEO) {
+        if (!parsed.supportsAudio && type == DownloadType.AUDIO) {
+            whatsapp.sendText(message.chatId, text.socialAudioNotSupported(), message.id)
+            return
+        }
+        if (parsed.kind == MediaUrl.Kind.PLAYLIST && type == DownloadType.VIDEO) {
             whatsapp.sendText(message.chatId, text.playlistVideoNotSupported(), message.id)
             return
         }
 
-        val isPlaylist = parsed.kind == YouTubeUrl.Kind.PLAYLIST
-        val title = if (isPlaylist) "YouTube playlist" else "YouTube link"
+        val isPlaylist = parsed.kind == MediaUrl.Kind.PLAYLIST
+        val title = text.directLinkTitle(parsed.source, isPlaylist)
+        val channel = when (parsed.source) {
+            MediaUrl.Source.YOUTUBE -> "YouTube"
+            MediaUrl.Source.INSTAGRAM -> "Instagram"
+            MediaUrl.Source.TIKTOK -> "TikTok"
+        }
         val video = YouTubeVideoResult(
             title = title,
-            channel = "YouTube",
+            channel = channel,
             videoId = if (isPlaylist) "playlist" else url.substringAfterLast("/").substringBefore("?").take(32).ifBlank { "direct" },
             url = url,
             durationSeconds = 0,
@@ -179,6 +193,22 @@ class BotEngine(
         }
     }
 
+    private suspend fun sendSticker(message: IncomingWhatsAppMessage, text: BotMessages) {
+        if (message.isGroupChat()) return
+        val media = listOfNotNull(message.media, message.quotedMedia)
+            .firstOrNull { it.type == IncomingMediaType.IMAGE && it.file.exists() && it.file.length() > 0L }
+        if (media == null) {
+            whatsapp.sendText(message.chatId, text.stickerImageRequired(), message.id)
+            return
+        }
+        runCatching {
+            whatsapp.sendSticker(message.chatId, media.file, message.id)
+        }.onFailure {
+            logger.error("BotEngine", "Sticker conversion/send failed", it)
+            whatsapp.sendText(message.chatId, text.stickerFailed(safeError(it)), message.id)
+        }
+    }
+
     private fun quotedSearchQuery(text: String?): String? {
         if (text.isNullOrBlank()) return null
         val prefixes = listOf(
@@ -208,6 +238,7 @@ class BotEngine(
     private fun localizedInvalid(reason: String, text: BotMessages): String = when {
         reason == "MISSING_SEARCH_QUERY" -> text.missingSearchQuery()
         reason == "INVALID_YOUTUBE_LINK" -> text.invalidYouTubeLink()
+        reason == "SOCIAL_AUDIO_NOT_SUPPORTED" -> text.socialAudioNotSupported()
         reason == "INVALID_VIDEO_INDEX" -> text.invalidDownloadCommand(DownloadType.VIDEO)
         reason == "INVALID_AUDIO_INDEX" -> text.invalidDownloadCommand(DownloadType.AUDIO)
         else -> text.emptySearch()
@@ -230,6 +261,12 @@ private fun IncomingWhatsAppMessage.isBlacklisted(rawBlacklist: String): Boolean
         .filter { it.isNotBlank() }
         .any { blocked -> senderDigits == blocked || senderDigits.endsWith(blocked) || blocked.endsWith(senderDigits) }
 }
+
+private fun IncomingWhatsAppMessage.hasIncomingImage(): Boolean =
+    media?.let { it.type == IncomingMediaType.IMAGE && it.file.exists() && it.file.length() > 0L } == true
+
+private fun IncomingWhatsAppMessage.isGroupChat(): Boolean =
+    chatId.substringBefore(':').endsWith("@g.us", ignoreCase = true)
 
 private fun String.toReadableChatId(): String =
     substringBefore("@")

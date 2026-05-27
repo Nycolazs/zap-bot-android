@@ -2,6 +2,8 @@ package com.zapbot.android.whatsapp
 
 import android.app.Application
 import android.database.sqlite.SQLiteDatabase
+import com.zapbot.android.domain.IncomingWhatsAppMedia
+import com.zapbot.android.domain.IncomingMediaType
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -23,6 +25,7 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
     }.asCoroutineDispatcher()
     private val storeDir = File(app.filesDir, "whatsmeow")
     private val storeDb = File(storeDir, "whatsmeow.db")
+    private val stickerHelper = StickerHelper(app.cacheDir)
     private val state = MutableStateFlow<WhatsAppConnectionState>(WhatsAppConnectionState.Disconnected)
     private val savedSession = MutableStateFlow(readSavedSession())
     private val messages = MutableSharedFlow<IncomingWhatsAppMessage>(extraBufferCapacity = 128)
@@ -39,15 +42,18 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
             }
 
             override fun onMessage(id: String, chatID: String, senderName: String, text: String, quotedMessageID: String, quotedText: String, timestampMillis: Long) {
+                val quotedId = quotedMessageID.ifBlank { null }
                 messages.tryEmit(
                     IncomingWhatsAppMessage(
                         id = id,
                         chatId = chatID,
                         senderName = senderName.ifBlank { null },
                         text = text,
-                        quotedMessageId = quotedMessageID.ifBlank { null },
+                        quotedMessageId = quotedId,
                         quotedText = quotedText.ifBlank { null },
-                        timestamp = timestampMillis
+                        timestamp = timestampMillis,
+                        media = mediaForMessage(id),
+                        quotedMedia = quotedId?.let { mediaForMessage(it) }
                     )
                 )
             }
@@ -105,6 +111,39 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
         bridge.sendMedia(chatId, file.absolutePath, caption.orEmpty(), mimeType(file))
     }
 
+    override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) = withContext(bridgeDispatcher) {
+        val webp = stickerHelper.convertToWebp(image)
+        try {
+            val sendSticker = bridge.javaClass.methods.firstOrNull { it.name == "sendSticker" && it.parameterTypes.size == 2 }
+                ?: error("whatsmeowbridge AAR precisa ser regenerado com suporte a sendSticker")
+            sendSticker.invoke(bridge, chatId, webp.absolutePath)
+        } finally {
+            stickerHelper.deleteWhenSafe(webp)
+        }
+        Unit
+    }
+
+    private fun mediaForMessage(id: String): IncomingWhatsAppMedia? {
+        val path = bridgeStringMethod("mediaPathForMessage", id).takeIf { it.isNotBlank() } ?: return null
+        val file = File(path)
+        if (!file.exists() || !file.isFile) return null
+        val type = when (bridgeStringMethod("mediaTypeForMessage", id).lowercase()) {
+            "image" -> IncomingMediaType.IMAGE
+            else -> return null
+        }
+        return IncomingWhatsAppMedia(
+            type = type,
+            file = file,
+            mimeType = bridgeStringMethod("mediaMimeForMessage", id).ifBlank { mimeType(file) },
+            fileName = bridgeStringMethod("mediaFileNameForMessage", id).ifBlank { file.name }
+        )
+    }
+
+    private fun bridgeStringMethod(name: String, argument: String): String =
+        runCatching {
+            bridge.javaClass.getMethod(name, String::class.java).invoke(bridge, argument) as? String
+        }.getOrNull().orEmpty()
+
     private fun String.toConnectionState(detail: String): WhatsAppConnectionState = when (this) {
         "connecting" -> WhatsAppConnectionState.Connecting
         "running" -> WhatsAppConnectionState.Running
@@ -115,6 +154,8 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
 
     private fun mimeType(file: File): String = when (file.extension.lowercase()) {
         "mp4" -> "video/mp4"
+        "mov" -> "video/quicktime"
+        "mkv" -> "video/x-matroska"
         "webm" -> "video/webm"
         "m4a" -> "audio/mp4"
         "mp3" -> "audio/mpeg"
@@ -122,6 +163,7 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
         "zip" -> "application/zip"
         "jpg", "jpeg" -> "image/jpeg"
         "png" -> "image/png"
+        "webp" -> "image/webp"
         else -> "application/octet-stream"
     }
 

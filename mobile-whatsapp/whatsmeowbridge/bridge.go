@@ -27,16 +27,24 @@ type Listener interface {
 	OnError(message string)
 }
 
+type incomingMedia struct {
+	mediaType string
+	path      string
+	mime      string
+	fileName  string
+}
+
 type Bridge struct {
 	mu        sync.Mutex
 	rootDir   string
 	listener  Listener
 	container *sqlstore.Container
 	client    *whatsmeow.Client
+	media     map[string]incomingMedia
 }
 
 func NewBridge(rootDir string, listener Listener) *Bridge {
-	return &Bridge{rootDir: rootDir, listener: listener}
+	return &Bridge{rootDir: rootDir, listener: listener, media: make(map[string]incomingMedia)}
 }
 
 func (b *Bridge) Start() error {
@@ -223,6 +231,74 @@ func (b *Bridge) SendMedia(chatID string, path string, caption string, mime stri
 	return err
 }
 
+func (b *Bridge) SendSticker(chatID string, path string) error {
+	b.mu.Lock()
+	client := b.client
+	b.mu.Unlock()
+	if client == nil || !client.IsConnected() {
+		return errors.New("whatsapp is not connected")
+	}
+	jid, err := types.ParseJID(chatID)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	upload, err := client.Upload(ctx, data, whatsmeow.MediaImage)
+	if err != nil {
+		return err
+	}
+	_, err = client.SendMessage(ctx, jid, &waProto.Message{StickerMessage: &waProto.StickerMessage{
+		Mimetype:      proto.String("image/webp"),
+		URL:           proto.String(upload.URL),
+		DirectPath:    proto.String(upload.DirectPath),
+		MediaKey:      upload.MediaKey,
+		FileEncSHA256: upload.FileEncSHA256,
+		FileSHA256:    upload.FileSHA256,
+		FileLength:    proto.Uint64(upload.FileLength),
+		IsAnimated:    proto.Bool(false),
+	}})
+	return err
+}
+
+func (b *Bridge) MediaTypeForMessage(id string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.media[id].mediaType
+}
+
+func (b *Bridge) MediaPathForMessage(id string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.media[id].path
+}
+
+func (b *Bridge) MediaMimeForMessage(id string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.media[id].mime
+}
+
+func (b *Bridge) MediaFileNameForMessage(id string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.media[id].fileName
+}
+
+func (b *Bridge) CleanupMediaForMessage(id string) {
+	b.mu.Lock()
+	media := b.media[id]
+	delete(b.media, id)
+	b.mu.Unlock()
+	if media.path != "" {
+		_ = os.Remove(media.path)
+	}
+}
+
 func isUploadTooLarge(err error) bool {
 	if err == nil {
 		return false
@@ -238,6 +314,7 @@ func (b *Bridge) clientLocked(reset bool) (*whatsmeow.Client, error) {
 	if err := os.MkdirAll(b.rootDir, 0700); err != nil {
 		return nil, err
 	}
+	b.cleanupOldMediaCache()
 	container, err := sqlstore.New(context.Background(), "sqlite", "file:"+filepath.Join(b.rootDir, "whatsmeow.db")+"?_pragma=foreign_keys(1)", nil)
 	if err != nil {
 		return nil, err
@@ -269,13 +346,53 @@ func (b *Bridge) handleEvent(evt interface{}) {
 			return
 		}
 		text := messageText(event.Message)
-		if strings.TrimSpace(text) == "" {
+		media := b.cacheIncomingImage(event.Info.ID, event.Message, false)
+		if quotedID := quotedMessageID(event.Message); quotedID != "" {
+			_ = b.cacheIncomingImage(quotedID, quotedMessage(event.Message), true)
+		}
+		if strings.TrimSpace(text) == "" && media.path == "" {
 			return
 		}
 		if b.listener != nil {
 			b.listener.OnMessage(event.Info.ID, event.Info.Chat.String(), event.Info.PushName, text, quotedMessageID(event.Message), quotedMessageText(event.Message), event.Info.Timestamp.UnixMilli())
 		}
 	}
+}
+
+func (b *Bridge) cacheIncomingImage(id string, message *waProto.Message, quiet bool) incomingMedia {
+	if id == "" || message == nil || message.GetImageMessage() == nil {
+		return incomingMedia{}
+	}
+	image := message.GetImageMessage()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	data, err := b.client.Download(ctx, image)
+	if err != nil {
+		if !quiet {
+			b.emitError(fmt.Errorf("failed to download image message: %w", err))
+		}
+		return incomingMedia{}
+	}
+	mime := image.GetMimetype()
+	if mime == "" {
+		mime = "image/jpeg"
+	}
+	fileName := safeMediaFileName(id, mime)
+	cacheDir := filepath.Join(b.rootDir, "media-cache")
+	if err = os.MkdirAll(cacheDir, 0700); err != nil {
+		b.emitError(err)
+		return incomingMedia{}
+	}
+	path := filepath.Join(cacheDir, fileName)
+	if err = os.WriteFile(path, data, 0600); err != nil {
+		b.emitError(err)
+		return incomingMedia{}
+	}
+	media := incomingMedia{mediaType: "image", path: path, mime: mime, fileName: fileName}
+	b.mu.Lock()
+	b.media[id] = media
+	b.mu.Unlock()
+	return media
 }
 
 func messageText(message *waProto.Message) string {
@@ -320,23 +437,26 @@ func quotedMessageID(message *waProto.Message) string {
 }
 
 func quotedMessageText(message *waProto.Message) string {
+	return messageText(quotedMessage(message))
+}
+
+func quotedMessage(message *waProto.Message) *waProto.Message {
 	if message == nil {
-		return ""
+		return nil
 	}
-	var quoted *waProto.Message
 	if extended := message.GetExtendedTextMessage(); extended != nil && extended.GetContextInfo() != nil {
-		quoted = extended.GetContextInfo().GetQuotedMessage()
+		return extended.GetContextInfo().GetQuotedMessage()
 	}
 	if image := message.GetImageMessage(); image != nil && image.GetContextInfo() != nil {
-		quoted = image.GetContextInfo().GetQuotedMessage()
+		return image.GetContextInfo().GetQuotedMessage()
 	}
 	if video := message.GetVideoMessage(); video != nil && video.GetContextInfo() != nil {
-		quoted = video.GetContextInfo().GetQuotedMessage()
+		return video.GetContextInfo().GetQuotedMessage()
 	}
 	if document := message.GetDocumentMessage(); document != nil && document.GetContextInfo() != nil {
-		quoted = document.GetContextInfo().GetQuotedMessage()
+		return document.GetContextInfo().GetQuotedMessage()
 	}
-	return messageText(quoted)
+	return nil
 }
 
 func mediaMessage(mediaType whatsmeow.MediaType, upload whatsmeow.UploadResponse, caption, fileName, mime string) *waProto.Message {
@@ -415,6 +535,10 @@ func mimeFromPath(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".mp4":
 		return "video/mp4"
+	case ".mov":
+		return "video/quicktime"
+	case ".mkv":
+		return "video/x-matroska"
 	case ".m4a":
 		return "audio/mp4"
 	case ".mp3":
@@ -428,4 +552,41 @@ func mimeFromPath(path string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+func (b *Bridge) cleanupOldMediaCache() {
+	cacheDir := filepath.Join(b.rootDir, "media-cache")
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-24 * time.Hour)
+	for _, entry := range entries {
+		info, statErr := entry.Info()
+		if statErr == nil && info.ModTime().Before(cutoff) {
+			_ = os.Remove(filepath.Join(cacheDir, entry.Name()))
+		}
+	}
+}
+
+func safeMediaFileName(id, mime string) string {
+	ext := ".jpg"
+	switch strings.ToLower(mime) {
+	case "image/png":
+		ext = ".png"
+	case "image/webp":
+		ext = ".webp"
+	case "image/gif":
+		ext = ".gif"
+	}
+	var builder strings.Builder
+	for _, char := range id {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_' {
+			builder.WriteRune(char)
+		}
+	}
+	if builder.Len() == 0 {
+		builder.WriteString(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+	return builder.String() + ext
 }
