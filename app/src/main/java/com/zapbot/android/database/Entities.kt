@@ -20,6 +20,7 @@ data class BotSettingsEntity(
     val appLanguage: String = "system",
     val botLanguage: String = "system",
     val networkPreference: String = "WIFI_ONLY",
+    val welcomeMessagesEnabled: Boolean = true,
     val blacklistedNumbers: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

@@ -3,7 +3,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)](#development)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v1.4.5-111827)](https://github.com/Nycolazs/zap-bot-android/releases)
+[![Release](https://img.shields.io/badge/Release-v1.4.6-111827)](https://github.com/Nycolazs/Zappy/releases)
 
 Zappy is a native Android app that turns an Android phone into a WhatsApp-linked media bot. It pairs with WhatsApp as a linked device, listens for slash commands, searches YouTube, downloads media on-device, and sends audio, video, playlists, Instagram videos, TikTok videos, and private-chat stickers back to WhatsApp.
 
@@ -40,12 +40,12 @@ Built with Kotlin, Jetpack Compose, Material 3, Room, youtubedl-android, FFmpeg,
 
 Get the latest APK from GitHub Releases:
 
-https://github.com/Nycolazs/zap-bot-android/releases
+https://github.com/Nycolazs/Zappy/releases
 
 Current version:
 
-- `versionName`: `1.4.5`
-- `versionCode`: `10`
+- `versionName`: `1.4.6`
+- `versionCode`: `11`
 - `minSdk`: `26`
 - `targetSdk`: `35`
 
@@ -92,7 +92,7 @@ Direct-link rules:
 - Instagram and TikTok links are supported with `/v` only.
 - Images sent in private chats become stickers automatically; groups are ignored for sticker conversion.
 
-When a person sends their first message to Zappy, the bot sends a one-time welcome message in the selected bot-message language with basic commands and `/help`.
+When enabled in Automation settings, the bot sends a one-time welcome message in the selected bot-message language with basic commands and `/help` when a person sends their first message to Zappy.
 
 ## Languages
 
@@ -121,6 +121,7 @@ The Settings screen includes:
 - Light, dark, and system theme modes.
 - Start on boot.
 - Foreground notifications and detailed notifications.
+- First-message welcome toggle.
 - Battery settings shortcut.
 - Concurrent download count.
 - Video quality limit.

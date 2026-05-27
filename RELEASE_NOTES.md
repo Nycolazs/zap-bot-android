@@ -1,6 +1,12 @@
-# Zappy v1.4.5
+# Zappy v1.4.6
 
 ## What's New
+
+- Added an Automation setting to enable or disable the one-time first-message welcome.
+- The bot now respects the welcome setting before sending or recording first-contact welcomes.
+- Added a Room migration so existing installs keep the welcome enabled by default.
+
+## Previous v1.4.5 Highlights
 
 - Renamed the project and app to Zappy.
 - Added a one-time first-message welcome with basic commands in the selected bot-message language.

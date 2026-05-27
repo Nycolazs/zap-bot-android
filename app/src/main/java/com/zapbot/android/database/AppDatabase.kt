@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DownloadJobEntity::class,
         BotLogEntity::class
     ],
-    version = 8
+    version = 9
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -76,6 +76,12 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bot_settings ADD COLUMN welcomeMessagesEnabled INTEGER NOT NULL DEFAULT 1")
             }
         }
     }

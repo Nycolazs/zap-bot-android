@@ -36,7 +36,9 @@ class BotEngine(
             return
         }
         val text = BotMessages(currentSettings.botLanguage)
-        sendWelcomeIfNeeded(message, text)
+        if (currentSettings.welcomeMessagesEnabled) {
+            sendWelcomeIfNeeded(message, text)
+        }
         if (message.hasIncomingImage() && !message.isGroupChat()) {
             sendSticker(message, text)
             return

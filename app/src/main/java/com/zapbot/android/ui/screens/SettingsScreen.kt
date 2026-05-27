@@ -231,6 +231,9 @@ fun SettingsScreen(
             ToggleRow(t("detailed_notifications"), t("detailed_notifications_desc"), settings.detailedNotificationsEnabled) {
                 onUpdate { it.copy(detailedNotificationsEnabled = !it.detailedNotificationsEnabled) }
             }
+            ToggleRow(t("welcome_messages"), t("welcome_messages_desc"), settings.welcomeMessagesEnabled) {
+                onUpdate { it.copy(welcomeMessagesEnabled = !it.welcomeMessagesEnabled) }
+            }
             FilledTonalButton(onClick = onBattery, modifier = Modifier.fillMaxWidth()) {
                 Text(t("battery"))
             }
