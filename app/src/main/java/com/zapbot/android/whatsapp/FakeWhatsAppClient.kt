@@ -2,6 +2,7 @@ package com.zapbot.android.whatsapp
 
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.domain.WhatsAppChatPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,24 +42,24 @@ class FakeWhatsAppClient : WhatsAppClient {
     }
 
     override suspend fun sendText(chatId: String, text: String, replyToMessageId: String?): String {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return "ignored-non-private"
         sentTexts += "$chatId:$text"
         return "fake-sent-${sentTexts.size}"
     }
 
-    override suspend fun sendTextToGroupName(groupName: String, text: String): String {
-        sentTexts += "$groupName:$text"
-        return "fake-group-${sentTexts.size}"
-    }
+    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = null
 
     override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return
         sentMedia += file
     }
 
     override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return
         sentStickers += image
     }
 
-    suspend fun receive(text: String, chatId: String = "chat-1", id: String = System.nanoTime().toString()) {
+    suspend fun receive(text: String, chatId: String = "5511999999999@s.whatsapp.net", id: String = System.nanoTime().toString()) {
         messages.emit(
             IncomingWhatsAppMessage(
                 id = id,

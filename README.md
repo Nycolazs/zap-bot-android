@@ -3,7 +3,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)](#development)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v1.4.6-111827)](https://github.com/Nycolazs/Zappy/releases)
+[![Release](https://img.shields.io/badge/Release-v1.4.7-111827)](https://github.com/Nycolazs/Zappy/releases)
 
 Zappy is a native Android app that turns an Android phone into a WhatsApp-linked media bot. It pairs with WhatsApp as a linked device, listens for slash commands, searches YouTube, downloads media on-device, and sends audio, video, playlists, Instagram videos, TikTok videos, and private-chat stickers back to WhatsApp.
 
@@ -44,8 +44,8 @@ https://github.com/Nycolazs/Zappy/releases
 
 Current version:
 
-- `versionName`: `1.4.6`
-- `versionCode`: `11`
+- `versionName`: `1.4.7`
+- `versionCode`: `12`
 - `minSdk`: `26`
 - `targetSdk`: `35`
 

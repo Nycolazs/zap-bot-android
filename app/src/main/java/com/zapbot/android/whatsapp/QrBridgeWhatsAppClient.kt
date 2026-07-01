@@ -37,9 +37,7 @@ class QrBridgeWhatsAppClient : WhatsAppClient {
         error("WhatsApp QR bridge is not configured")
     }
 
-    override suspend fun sendTextToGroupName(groupName: String, text: String): String? {
-        error("WhatsApp QR bridge is not configured")
-    }
+    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = null
 
     override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) {
         error("WhatsApp QR bridge is not configured")

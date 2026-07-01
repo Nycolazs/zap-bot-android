@@ -6,6 +6,7 @@ import com.zapbot.android.domain.IncomingWhatsAppMedia
 import com.zapbot.android.domain.IncomingMediaType
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.domain.WhatsAppChatPolicy
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -42,6 +43,7 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
             }
 
             override fun onMessage(id: String, chatID: String, senderName: String, text: String, quotedMessageID: String, quotedText: String, timestampMillis: Long) {
+                if (!WhatsAppChatPolicy.isPrivateChat(chatID)) return
                 val quotedId = quotedMessageID.ifBlank { null }
                 messages.tryEmit(
                     IncomingWhatsAppMessage(
@@ -100,18 +102,21 @@ class WhatsmeowWhatsAppClient(app: Application) : WhatsAppClient {
     }
 
     override suspend fun sendText(chatId: String, text: String, replyToMessageId: String?): String? = withContext(bridgeDispatcher) {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return@withContext null
         bridge.sendText(chatId, text)
     }
 
-    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = withContext(bridgeDispatcher) {
-        bridge.sendTextToGroupName(groupName, text)
-    }
+    override suspend fun sendTextToGroupName(groupName: String, text: String): String? = null
 
     override suspend fun sendMedia(chatId: String, file: File, caption: String?, replyToMessageId: String?) = withContext(bridgeDispatcher) {
-        bridge.sendMedia(chatId, file.absolutePath, caption.orEmpty(), mimeType(file))
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return@withContext
+        val mimeType = mimeType(file)
+        require(mimeType != "application/octet-stream") { "Unsupported media type: ${file.name}" }
+        bridge.sendMedia(chatId, file.absolutePath, caption.orEmpty(), mimeType)
     }
 
     override suspend fun sendSticker(chatId: String, image: File, replyToMessageId: String?) = withContext(bridgeDispatcher) {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return@withContext
         val webp = stickerHelper.convertToWebp(image)
         try {
             val sendSticker = bridge.javaClass.methods.firstOrNull { it.name == "sendSticker" && it.parameterTypes.size == 2 }

@@ -1,6 +1,16 @@
-# Zappy v1.4.6
+# Zappy v1.4.7
 
 ## What's New
+
+- Hardened the bot so it only handles private WhatsApp chats and ignores groups, status, broadcasts, and newsletters.
+- Removed operational WhatsApp group alerts.
+- Improved TikTok and Instagram video download handling with stricter MP4 output, upload-size limits, retries, and safer yt-dlp update attempts.
+- Prevented oversized or unknown media from being sent as generic `.bin` files.
+- Added sticker metadata: `Sticker created with Zappy BOT 🤖 by @nycolazs`.
+- Added clearer runtime logs for bot start/stop, missing WhatsApp sessions, WhatsApp bridge state changes, and startup failures.
+- Kept diagnostics in the Logs screen instead of adding extra status cards to Home.
+
+## Previous v1.4.6 Highlights
 
 - Added an Automation setting to enable or disable the one-time first-message welcome.
 - The bot now respects the welcome setting before sending or recording first-contact welcomes.

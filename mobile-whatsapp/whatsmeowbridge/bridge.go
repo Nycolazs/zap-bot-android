@@ -157,6 +157,9 @@ func (b *Bridge) SendText(chatID string, text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !isPrivateChatJID(jid) {
+		return "", errors.New("refusing to send to non-private chat")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	resp, err := client.SendMessage(ctx, jid, &waProto.Message{Conversation: proto.String(text)})
@@ -164,27 +167,7 @@ func (b *Bridge) SendText(chatID string, text string) (string, error) {
 }
 
 func (b *Bridge) SendTextToGroupName(groupName string, text string) (string, error) {
-	b.mu.Lock()
-	client := b.client
-	b.mu.Unlock()
-	if client == nil || !client.IsConnected() {
-		return "", errors.New("whatsapp is not connected")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	groups, err := client.GetJoinedGroups(ctx)
-	if err != nil {
-		return "", err
-	}
-	for _, group := range groups {
-		if strings.EqualFold(strings.TrimSpace(group.Name), strings.TrimSpace(groupName)) {
-			ctx, sendCancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer sendCancel()
-			resp, err := client.SendMessage(ctx, group.JID, &waProto.Message{Conversation: proto.String(text)})
-			return resp.ID, err
-		}
-	}
-	return "", fmt.Errorf("group not found: %s", groupName)
+	return "", errors.New("group sends are disabled")
 }
 
 func (b *Bridge) SendMedia(chatID string, path string, caption string, mime string) error {
@@ -197,6 +180,9 @@ func (b *Bridge) SendMedia(chatID string, path string, caption string, mime stri
 	jid, err := types.ParseJID(chatID)
 	if err != nil {
 		return err
+	}
+	if !isPrivateChatJID(jid) {
+		return errors.New("refusing to send to non-private chat")
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -213,18 +199,11 @@ func (b *Bridge) SendMedia(chatID string, path string, caption string, mime stri
 	} else if strings.HasPrefix(mime, "image/") {
 		mediaType = whatsmeow.MediaImage
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 	upload, err := client.Upload(ctx, data, mediaType)
 	if err != nil {
-		if mediaType == whatsmeow.MediaVideo && isUploadTooLarge(err) {
-			mediaType = whatsmeow.MediaDocument
-			mime = "application/octet-stream"
-			upload, err = client.Upload(ctx, data, mediaType)
-		}
-		if err != nil {
-			return err
-		}
+		return err
 	}
 	message := mediaMessage(mediaType, upload, caption, filepath.Base(path), mime)
 	_, err = client.SendMessage(ctx, jid, message)
@@ -241,6 +220,9 @@ func (b *Bridge) SendSticker(chatID string, path string) error {
 	jid, err := types.ParseJID(chatID)
 	if err != nil {
 		return err
+	}
+	if !isPrivateChatJID(jid) {
+		return errors.New("refusing to send to non-private chat")
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -299,14 +281,6 @@ func (b *Bridge) CleanupMediaForMessage(id string) {
 	}
 }
 
-func isUploadTooLarge(err error) bool {
-	if err == nil {
-		return false
-	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "413") || strings.Contains(message, "too large") || strings.Contains(message, "request entity")
-}
-
 func (b *Bridge) clientLocked(reset bool) (*whatsmeow.Client, error) {
 	if b.client != nil && !reset {
 		return b.client, nil
@@ -343,6 +317,9 @@ func (b *Bridge) handleEvent(evt interface{}) {
 		b.emitState("disconnected", "logged out")
 	case *events.Message:
 		if event.Info.IsFromMe {
+			return
+		}
+		if !isPrivateChatJID(event.Info.Chat) {
 			return
 		}
 		text := messageText(event.Message)
@@ -539,6 +516,8 @@ func mimeFromPath(path string) string {
 		return "video/quicktime"
 	case ".mkv":
 		return "video/x-matroska"
+	case ".webm":
+		return "video/webm"
 	case ".m4a":
 		return "audio/mp4"
 	case ".mp3":
@@ -552,6 +531,23 @@ func mimeFromPath(path string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+func isPrivateChatJID(jid types.JID) bool {
+	value := strings.ToLower(strings.TrimSpace(jid.String()))
+	value = strings.Split(value, ":")[0]
+	if value == "" {
+		return false
+	}
+	if strings.HasSuffix(value, "@g.us") ||
+		strings.HasSuffix(value, "@broadcast") ||
+		strings.HasSuffix(value, "@newsletter") ||
+		value == "status@broadcast" {
+		return false
+	}
+	return strings.HasSuffix(value, "@s.whatsapp.net") ||
+		strings.HasSuffix(value, "@c.us") ||
+		strings.HasSuffix(value, "@lid")
 }
 
 func (b *Bridge) cleanupOldMediaCache() {

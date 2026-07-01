@@ -11,10 +11,6 @@ import com.zapbot.android.queue.DownloadQueueManager
 import com.zapbot.android.settings.SettingsRepository
 import com.zapbot.android.whatsapp.WhatsAppClient
 import com.zapbot.android.youtube.YouTubeSearchClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class BotEngine(
     private val parser: BotCommandParser,
@@ -27,9 +23,11 @@ class BotEngine(
     private val settings: SettingsRepository,
     private val logger: BotLogger
 ) {
-    private val alertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     suspend fun handle(message: IncomingWhatsAppMessage) {
+        if (!message.isPrivateChat()) {
+            logger.info("BotEngine", "Ignored non-private chat ${message.chatId}")
+            return
+        }
         val currentSettings = settings.get()
         if (message.isBlacklisted(currentSettings.blacklistedNumbers)) {
             logger.info("BotEngine", "Ignored blacklisted sender ${message.senderLabel()}")
@@ -39,7 +37,7 @@ class BotEngine(
         if (currentSettings.welcomeMessagesEnabled) {
             sendWelcomeIfNeeded(message, text)
         }
-        if (message.hasIncomingImage() && !message.isGroupChat()) {
+        if (message.hasIncomingImage()) {
             sendSticker(message, text)
             return
         }
@@ -66,10 +64,7 @@ class BotEngine(
 
     private suspend fun search(message: IncomingWhatsAppMessage, query: String, text: BotMessages) {
         try {
-            runCatching {
-                whatsapp.sendText(message.chatId, text.searching(query), message.id)
-            }
-            alert("🔎 *Pesquisa recebida*\n\n_Chat:_ ${message.chatId}\n_Busca:_ $query")
+            runCatching { whatsapp.sendText(message.chatId, text.searching(query), message.id) }
             val results = youtube.searchVideos(query, SEARCH_RESULT_LIMIT)
             if (results.isEmpty()) {
                 whatsapp.sendText(
@@ -81,11 +76,9 @@ class BotEngine(
             }
             val sentMessageId = whatsapp.sendText(message.chatId, text.searchResults(query, results), message.id)
             sessions.save(message.chatId, query, results, sentMessageId)
-            alert("✅ *Pesquisa enviada*\n\n_Busca:_ $query\n_Resultados:_ ${results.size}")
             logger.info("BotEngine", "Search completed for ${message.senderLabel()}")
         } catch (t: Throwable) {
             logger.error("BotEngine", "Search failed", t)
-            alert("🚨 *Erro na pesquisa*\n\n_Busca:_ $query\n_Motivo:_ ${safeError(t)}")
             whatsapp.sendText(
                 message.chatId,
                 text.searchFailed(safeError(t)),
@@ -123,7 +116,6 @@ class BotEngine(
                     text.downloadStarted(selected.video, type),
                     message.id
                 )
-                alert("⬇️ *Download enfileirado*\n\n_Tipo:_ ${if (type == DownloadType.VIDEO) "Vídeo" else "Áudio"}\n_Título:_ ${selected.video.title}\n_Canal:_ ${selected.video.channel}")
                 queue.enqueue(DownloadRequest(jobId, message.chatId, message.id, selected.video, type))
             }
         }
@@ -170,7 +162,6 @@ class BotEngine(
             )
         )
         whatsapp.sendText(message.chatId, text.downloadStarted(video, type), message.id)
-        alert("⬇️ *Download por link enfileirado*\n\n_Tipo:_ ${if (type == DownloadType.VIDEO) "Vídeo" else if (isPlaylist) "Playlist áudio" else "Áudio"}\n_Link:_ $url")
         queue.enqueue(DownloadRequest(jobId, message.chatId, message.id, video, type, sourceUrl = url, isPlaylist = isPlaylist))
     }
 
@@ -206,7 +197,7 @@ class BotEngine(
     }
 
     private suspend fun sendSticker(message: IncomingWhatsAppMessage, text: BotMessages) {
-        if (message.isGroupChat()) return
+        if (!message.isPrivateChat()) return
         val media = listOfNotNull(message.media, message.quotedMedia)
             .firstOrNull { it.type == IncomingMediaType.IMAGE && it.file.exists() && it.file.length() > 0L }
         if (media == null) {
@@ -241,12 +232,6 @@ class BotEngine(
     private fun safeError(t: Throwable): String =
         (t.message ?: t.javaClass.simpleName).replace(Regex("[\\r\\n]+"), " ").take(180)
 
-    private fun alert(text: String) {
-        alertScope.launch {
-            runCatching { whatsapp.sendTextToGroupName(ALERT_GROUP_NAME, text) }
-        }
-    }
-
     private fun localizedInvalid(reason: String, text: BotMessages): String = when {
         reason == "MISSING_SEARCH_QUERY" -> text.missingSearchQuery()
         reason == "INVALID_YOUTUBE_LINK" -> text.invalidYouTubeLink()
@@ -258,7 +243,6 @@ class BotEngine(
 
     private companion object {
         const val SEARCH_RESULT_LIMIT = 8
-        const val ALERT_GROUP_NAME = "Alerta Zappy"
     }
 }
 
@@ -276,9 +260,6 @@ private fun IncomingWhatsAppMessage.isBlacklisted(rawBlacklist: String): Boolean
 
 private fun IncomingWhatsAppMessage.hasIncomingImage(): Boolean =
     media?.let { it.type == IncomingMediaType.IMAGE && it.file.exists() && it.file.length() > 0L } == true
-
-private fun IncomingWhatsAppMessage.isGroupChat(): Boolean =
-    chatId.substringBefore(':').endsWith("@g.us", ignoreCase = true)
 
 private fun String.toReadableChatId(): String =
     substringBefore("@")

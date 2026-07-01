@@ -35,10 +35,13 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         val mediaUrl = MediaUrlParser.parse(video.url)
         val request = baseRequest(video.url, outputDir).apply {
             if (mediaUrl?.source == MediaUrl.Source.INSTAGRAM || mediaUrl?.source == MediaUrl.Source.TIKTOK) {
-                addOption("-f", "bestvideo*+bestaudio/best")
+                addOption(
+                    "-f",
+                    "best[ext=mp4][vcodec!=none][acodec!=none][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[ext=mp4][vcodec!=none][acodec!=none][filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]/bestvideo*[ext=mp4][filesize<=$SAFE_VIDEO_UPLOAD_BYTES]+bestaudio[ext=m4a]/best[filesize<=$SAFE_VIDEO_UPLOAD_BYTES]/best[filesize_approx<=$SAFE_VIDEO_UPLOAD_BYTES]"
+                )
                 addOption("--merge-output-format", "mp4")
-                addOption("--remux-video", "mp4")
-                addOption("-S", "hasaud,ext:mp4:m4a,+size")
+                addOption("--recode-video", "mp4")
+                addOption("-S", "hasaud,ext:mp4:m4a,+size,+br")
             } else {
                 addOption(
                     "-f",
@@ -47,6 +50,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
                 addOption("--merge-output-format", "mp4")
                 addOption("-S", "res:$height,hasaud,ext:mp4:m4a,+size")
             }
+            addOption("--max-filesize", SAFE_VIDEO_UPLOAD_BYTES.toString())
         }
         emit(DownloadProgress(5, "Baixando vídeo"))
         executeAndValidate(request, processId(jobId), outputDir)
@@ -107,7 +111,11 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
         if (file.extension.isBlank()) {
             error("Arquivo baixado sem extensão de mídia válida")
         }
-        DownloadResult(file, mimeType(file))
+        val mimeType = mimeType(file)
+        if (mimeType == "application/octet-stream") {
+            error("Arquivo baixado com tipo de mídia desconhecido: ${file.name}")
+        }
+        DownloadResult(file, mimeType)
     }
 
     override suspend fun cancel(jobId: Long) {
@@ -121,10 +129,14 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             addOption("--newline")
             addOption("--no-mtime")
             addOption("--no-warnings")
-            addOption("--force-ipv4")
             addOption("--concurrent-fragments", "8")
-            addOption("--retries", "3")
-            addOption("--fragment-retries", "3")
+            addOption("--retries", "5")
+            addOption("--fragment-retries", "5")
+            addOption("--extractor-retries", "3")
+            addOption("--retry-sleep", "fragment:exp=1:20")
+            addOption("--socket-timeout", "30")
+            addOption("--trim-filenames", "120")
+            addOption("--geo-bypass")
             when (mediaUrl?.source) {
                 MediaUrl.Source.INSTAGRAM -> {
                     addOption("--user-agent", MOBILE_USER_AGENT)
@@ -141,7 +153,7 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
                 }
             }
             addOption("--restrict-filenames")
-            addOption("-o", File(outputDir, "%(title).80B.%(ext)s").absolutePath)
+            addOption("-o", File(outputDir, "%(title).80B-%(id)s.%(ext)s").absolutePath)
         }
 
     private suspend fun zipFiles(files: List<File>, zipFile: File) = withContext(Dispatchers.IO) {
@@ -182,8 +194,34 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
             if (!initialized) {
                 YoutubeDL.getInstance().init(appContext)
                 FFmpeg.getInstance().init(appContext)
+                updateYoutubeDlIfStale()
                 initialized = true
             }
+        }
+    }
+
+    private fun updateYoutubeDlIfStale() {
+        val prefs = appContext.getSharedPreferences("zappy_downloader", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong("last_ytdlp_update_at", 0L) < YTDLP_UPDATE_INTERVAL_MS) return
+        val updated = runCatching {
+            val instance = YoutubeDL.getInstance()
+            val method = instance.javaClass.methods.firstOrNull { it.name == "updateYoutubeDL" }
+            when (method?.parameterTypes?.size) {
+                1 -> method.invoke(instance, appContext)
+                2 -> {
+                    val channelType = method.parameterTypes[1]
+                    val channel = channelType.enumConstants?.firstOrNull {
+                        it.toString().equals("STABLE", ignoreCase = true)
+                    } ?: channelType.enumConstants?.firstOrNull()
+                    method.invoke(instance, appContext, channel)
+                }
+                else -> null
+            }
+            method != null
+        }.getOrDefault(false)
+        if (updated) {
+            prefs.edit().putLong("last_ytdlp_update_at", now).apply()
         }
     }
 
@@ -220,7 +258,8 @@ class YtDlpMediaDownloader(private val appContext: Context) : MediaDownloader {
 
     private companion object {
         const val SAFE_VIDEO_HEIGHT = 360
-        const val SAFE_VIDEO_UPLOAD_BYTES = 1536L * 1024L * 1024L
+        const val SAFE_VIDEO_UPLOAD_BYTES = 15L * 1024L * 1024L
+        const val YTDLP_UPDATE_INTERVAL_MS = 24L * 60L * 60L * 1000L
         const val MAX_PLAYLIST_ITEMS = 50
         val AUDIO_EXTENSIONS = setOf("m4a", "mp4a", "mp3", "opus", "ogg")
         val MEDIA_EXTENSIONS = setOf("mp4", "m4a", "mp4a", "mp3", "opus", "ogg", "webm", "mov", "mkv", "zip")

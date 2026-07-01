@@ -31,6 +31,18 @@ function normalizePhone(phoneNumber) {
   return String(phoneNumber || '').replace(/\D/g, '')
 }
 
+function isPrivateChatId(chatId) {
+  const jid = String(chatId || '').split(':')[0].trim().toLowerCase()
+  if (!jid) return false
+  if (
+    jid === 'status@broadcast' ||
+    jid.endsWith('@g.us') ||
+    jid.endsWith('@broadcast') ||
+    jid.endsWith('@newsletter')
+  ) return false
+  return jid.endsWith('@s.whatsapp.net') || jid.endsWith('@c.us') || jid.endsWith('@lid')
+}
+
 async function startSocket() {
   if (sock) return publicState()
 
@@ -81,6 +93,7 @@ async function startSocket() {
   sock.ev.on('messages.upsert', ({ messages: incoming }) => {
     for (const msg of incoming || []) {
       if (!msg.message || msg.key.fromMe) continue
+      if (!isPrivateChatId(msg.key.remoteJid)) continue
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
@@ -142,6 +155,7 @@ app.post('/send-text', async (req, res) => {
     if (!sock || state.status !== 'running') return res.status(409).json({ error: 'WhatsApp nao conectado' })
     const { chatId, text } = req.body || {}
     if (!chatId || !text) return res.status(400).json({ error: 'chatId/text obrigatorios' })
+    if (!isPrivateChatId(chatId)) return res.status(403).json({ error: 'Envio permitido apenas para chats privados' })
     await sock.sendMessage(chatId, { text })
     res.json({ ok: true })
   } catch (error) {

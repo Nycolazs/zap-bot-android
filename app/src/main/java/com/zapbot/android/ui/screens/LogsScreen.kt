@@ -115,4 +115,4 @@ private fun phoneDisplay(phone: String): String = if (phone.startsWith("+")) pho
 
 private val PHONE_JID_REGEX = Regex("""\b(\+?\d{8,20})@(s\.whatsapp\.net|c\.us)\b""")
 private val LID_REGEX = Regex("""\b[A-Za-z0-9._-]+@lid\b""")
-private val BOT_LOG_TAGS = setOf("BotEngine", "Queue", "Service")
+private val BOT_LOG_TAGS = setOf("BotEngine", "Queue", "Service", "WhatsApp", "BootReceiver")

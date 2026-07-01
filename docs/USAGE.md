@@ -21,7 +21,7 @@
 
 1. On the home screen, tap `Start bot`.
 2. Keep the Android phone charged and, when possible, disable battery optimization for the app.
-3. Create a WhatsApp group named `Alerta Zappy` to receive activity, error, and low-battery alerts.
+3. Start the bot from the Android app. Zappy only responds in private WhatsApp chats and never posts operational alerts to groups, status, broadcasts, or newsletters.
 
 ## WhatsApp Commands
 

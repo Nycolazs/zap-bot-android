@@ -79,13 +79,11 @@ class DownloadQueueManager(
             validateWhatsAppMedia(request, result.file, text)
             whatsappClient.sendMedia(request.chatId, result.file, text.completedCaption(request.video, request.type, request.isPlaylist), request.messageId)
             jobDao.finish(request.jobId, DownloadStatus.COMPLETED, null)
-            alert("✅ *Envio concluído*\n\n_Título:_ ${request.video.title}\n_Tipo:_ ${request.type}\n_Tamanho:_ ${formatSize(result.file.length())}")
             if (settings.deleteFilesAfterSending) cleanup.cleanJob(request.jobId)
             logger.info("Queue", "Job ${request.jobId} completed")
         } catch (t: Throwable) {
             cleanup.cleanJob(request.jobId)
             jobDao.finish(request.jobId, DownloadStatus.FAILED, safeError(t, text))
-            alert("🚨 *Erro no download/envio*\n\n_Título:_ ${request.video.title}\n_Motivo:_ ${safeError(t, text)}")
             whatsappClient.sendText(
                 request.chatId,
                 text.sendFailed(safeError(t, text)),
@@ -128,12 +126,6 @@ class DownloadQueueManager(
         }
     }
 
-    private fun alert(text: String) {
-        scope.launch(Dispatchers.IO) {
-            runCatching { whatsappClient.sendTextToGroupName(ALERT_GROUP_NAME, text) }
-        }
-    }
-
     private fun formatSize(bytes: Long): String {
         val mb = bytes / 1024.0 / 1024.0
         return if (mb >= 1024.0) {
@@ -144,8 +136,7 @@ class DownloadQueueManager(
     }
 
     private companion object {
-        const val ALERT_GROUP_NAME = "Alerta Zappy"
-        const val MAX_WHATSAPP_VIDEO_BYTES = 1536L * 1024L * 1024L
+        const val MAX_WHATSAPP_VIDEO_BYTES = 15L * 1024L * 1024L
         val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mov", "mkv")
         val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "mp4a", "opus", "ogg", "zip")
     }

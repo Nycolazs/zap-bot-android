@@ -5,6 +5,7 @@ import com.zapbot.android.domain.IncomingMediaType
 import com.zapbot.android.domain.IncomingWhatsAppMedia
 import com.zapbot.android.domain.IncomingWhatsAppMessage
 import com.zapbot.android.domain.WhatsAppConnectionState
+import com.zapbot.android.domain.WhatsAppChatPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,7 +68,7 @@ class BridgeWhatsAppClient(
                     val batch = api.messages(lastSeq)
                     batch.messages.forEach {
                         lastSeq = maxOf(lastSeq, it.seq)
-                        if (it.text.isNotBlank()) {
+                        if (it.text.isNotBlank() && WhatsAppChatPolicy.isPrivateChat(it.chatId)) {
                             messages.emit(
                                 IncomingWhatsAppMessage(
                                     id = it.id,
@@ -111,6 +112,7 @@ class BridgeWhatsAppClient(
     }
 
     override suspend fun sendText(chatId: String, text: String, replyToMessageId: String?): String? {
+        if (!WhatsAppChatPolicy.isPrivateChat(chatId)) return null
         api.sendText(SendTextRequest(chatId, text, replyToMessageId))
         return null
     }

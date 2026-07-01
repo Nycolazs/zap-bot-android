@@ -1,7 +1,6 @@
 package com.zapbot.android.service
 
 import android.app.Service
-import android.os.BatteryManager
 import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.IBinder
@@ -22,8 +21,8 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
@@ -46,6 +45,8 @@ class BotForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            val container = (application as ZapBotApplication).container
+            scope.launch(Dispatchers.IO) { container.logger.info("Service", "Stop action received") }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -55,12 +56,16 @@ class BotForegroundService : Service() {
     }
 
     private fun startRuntime() {
-        if (started) return
+        if (started) {
+            val container = (application as ZapBotApplication).container
+            scope.launch(Dispatchers.IO) { container.logger.info("Service", "Start ignored because service is already running") }
+            return
+        }
         val container = (application as ZapBotApplication).container
         val hasWhatsAppSession = runBlocking(Dispatchers.IO) { container.whatsappClient.hasSavedSession.first() }
         if (!hasWhatsAppSession) {
             runBlocking(Dispatchers.IO) {
-                container.logger.warn("Service", "Bot start blocked because WhatsApp is not paired or connected")
+                container.logger.warn("Service", "Bot start blocked because WhatsApp has no saved linked-device session. Pair WhatsApp again in Settings.")
             }
             stopSelf()
             return
@@ -68,6 +73,7 @@ class BotForegroundService : Service() {
 
         started = true
         BotRuntimeState.markStarted()
+        runBlocking(Dispatchers.IO) { container.logger.info("Service", "Foreground service starting") }
         startForeground(
             BotNotificationManager.NOTIFICATION_ID,
             container.notifications.build(
@@ -99,7 +105,15 @@ class BotForegroundService : Service() {
             settings = container.settings,
             logger = container.logger
         )
-        scope.launch(Dispatchers.IO) { container.whatsappClient.start() }
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                container.logger.info("WhatsApp", "Starting WhatsApp linked-device bridge")
+                container.whatsappClient.start()
+                container.logger.info("WhatsApp", "WhatsApp bridge start call completed")
+            }.onFailure {
+                container.logger.error("WhatsApp", "WhatsApp bridge failed to start", it)
+            }
+        }
         scope.launch {
             container.whatsappClient.incomingMessages
                 .catch { container.logger.error("Service", "Message stream failed", it) }
@@ -109,6 +123,20 @@ class BotForegroundService : Service() {
                         scope.launch(Dispatchers.IO) {
                             container.logger.info("Service", "Message handled from ${it.senderLabel()}")
                         }
+                    }
+                }
+        }
+        scope.launch(Dispatchers.IO) {
+            container.whatsappClient.connectionState
+                .distinctUntilChanged()
+                .collect { state ->
+                    when (state) {
+                        WhatsAppConnectionState.Disconnected -> container.logger.warn("WhatsApp", "WhatsApp bridge is disconnected")
+                        WhatsAppConnectionState.Connecting -> container.logger.info("WhatsApp", "WhatsApp bridge is connecting")
+                        WhatsAppConnectionState.Running -> container.logger.info("WhatsApp", "WhatsApp bridge is running")
+                        is WhatsAppConnectionState.Connected -> container.logger.info("WhatsApp", "WhatsApp connected as ${state.phoneNumber.orEmpty()}")
+                        is WhatsAppConnectionState.WaitingForQr -> container.logger.warn("WhatsApp", "WhatsApp pairing is required")
+                        is WhatsAppConnectionState.Error -> container.logger.error("WhatsApp", "WhatsApp bridge error: ${state.message}", state.throwable)
                     }
                 }
         }
@@ -133,33 +161,15 @@ class BotForegroundService : Service() {
                     settings.networkPreference == "WIFI_ONLY" &&
                     transport == NetworkTransport.MOBILE
                 ) {
-                    container.logger.warn("Service", "Bot stopped because network changed from Wi-Fi to mobile data while network preference is Wi-Fi only")
-                    stopSelf()
+                    container.logger.warn("Service", "Network changed to mobile data while Wi-Fi only is configured; keeping bot running to avoid interrupting active chats")
                 }
-            }
-        }
-        scope.launch(Dispatchers.IO) {
-            var lastBatteryAlertAt = 0L
-            while (true) {
-                val battery = getSystemService(BatteryManager::class.java)
-                val level = battery?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
-                val now = System.currentTimeMillis()
-                if (level in 0..14 && now - lastBatteryAlertAt > 15 * 60 * 1_000L) {
-                    lastBatteryAlertAt = now
-                    runCatching {
-                        container.whatsappClient.sendTextToGroupName(
-                            "Alerta Zappy",
-                            "🔋 *Bateria baixa no celular do bot*\n\n_Nível atual:_ *$level%*\n\nColoque o aparelho para carregar para evitar que o bot caia."
-                        )
-                    }
-                }
-                delay(5 * 60 * 1_000L)
             }
         }
     }
 
     override fun onDestroy() {
         val container = (application as ZapBotApplication).container
+        runBlocking(Dispatchers.IO) { container.logger.info("Service", "Foreground service stopping") }
         runBlocking(Dispatchers.IO) { container.whatsappClient.stop() }
         BotRuntimeState.markStopped()
         releasePerformanceLocks()

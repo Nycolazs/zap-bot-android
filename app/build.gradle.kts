@@ -13,8 +13,8 @@ android {
         applicationId = "com.zapbot.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.4.6"
+        versionCode = 12
+        versionName = "1.4.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "YOUTUBE_API_KEY", "\"${providers.gradleProperty("YOUTUBE_API_KEY").orNull ?: ""}\"")

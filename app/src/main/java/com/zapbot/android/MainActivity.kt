@@ -1,8 +1,8 @@
 package com.zapbot.android
 
 import android.Manifest
-import android.content.res.Configuration
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     showMobileStartDialog = false
-                                    BotForegroundService.start(this, allowMobileNetwork = true)
+                                    viewModel.startBot(this, allowMobileNetwork = true)
                                 }) {
                                     Text(t("start_anyway"))
                                 }
@@ -118,10 +118,10 @@ class MainActivity : ComponentActivity() {
                             } else if (state.settings.networkPreference == "WIFI_ONLY" && !container.networkMonitor.isOnWifi()) {
                                 showMobileStartDialog = true
                             } else {
-                                BotForegroundService.start(this)
+                                viewModel.startBot(this)
                             }
                         },
-                        onStop = { startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP)) },
+                        onStop = { viewModel.stopBot(this) },
                         onOpenWhatsAppSettings = {
                             selectedPage = 3
                         },

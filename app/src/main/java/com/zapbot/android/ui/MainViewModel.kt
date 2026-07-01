@@ -1,5 +1,7 @@
 package com.zapbot.android.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -8,11 +10,14 @@ import com.zapbot.android.BuildConfig
 import com.zapbot.android.database.BotLogEntity
 import com.zapbot.android.database.BotSettingsEntity
 import com.zapbot.android.database.DownloadJobEntity
+import com.zapbot.android.domain.LogLevel
 import com.zapbot.android.domain.WhatsAppConnectionState
 import com.zapbot.android.service.BotRuntimeState
+import com.zapbot.android.service.BotForegroundService
 import com.zapbot.android.updates.UpdateCheckResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -32,7 +37,10 @@ data class DashboardState(
     val failedJobs: Int = 0,
     val hasWhatsAppSession: Boolean = false,
     val lastPairingCode: String? = null,
-    val pairingError: String? = null
+    val pairingError: String? = null,
+    val diagnosticTitle: String = "",
+    val diagnosticDetail: String = "",
+    val diagnosticIsError: Boolean = false
 )
 
 class MainViewModel(private val container: AppContainer) : ViewModel() {
@@ -62,6 +70,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         val active = values[2] as Int
         val logs = values[3] as List<BotLogEntity>
         val jobs = values[4] as List<DownloadJobEntity>
+        val visibleLogs = logs.filter { it.tag in DIAGNOSTIC_TAGS && !it.message.contains("Message handled", ignoreCase = true) }
+        val latestImportant = visibleLogs.firstOrNull { it.level == LogLevel.ERROR || it.level == LogLevel.WARN }
+            ?: visibleLogs.firstOrNull()
         DashboardState(
             settings = settings,
             connection = connection,
@@ -75,9 +86,41 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             failedJobs = jobs.count { it.status.name == "FAILED" },
             hasWhatsAppSession = values[5] as Boolean,
             lastPairingCode = values[6] as String?,
-            pairingError = values[7] as String?
+            pairingError = values[7] as String?,
+            diagnosticTitle = diagnosticTitle(connection, values[5] as Boolean),
+            diagnosticDetail = latestImportant?.let { "${it.tag}: ${it.message}" } ?: diagnosticDetail(connection, values[5] as Boolean),
+            diagnosticIsError = latestImportant?.let { it.level == LogLevel.ERROR || it.level == LogLevel.WARN } ?: (connection is WhatsAppConnectionState.Error)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
+
+    fun startBot(context: Context, allowMobileNetwork: Boolean = false) {
+        viewModelScope.launch {
+            val settings = container.settings.get()
+            val hasSession = runCatching { container.whatsappClient.hasSavedSession.first() }.getOrDefault(false)
+            if (!hasSession) {
+                container.logger.warn("Service", "Start requested but WhatsApp has no saved linked-device session")
+                return@launch
+            }
+            if (!allowMobileNetwork && settings.networkPreference == "WIFI_ONLY" && !container.networkMonitor.isOnWifi()) {
+                container.logger.warn("Service", "Start requested on mobile data while network preference is Wi-Fi only")
+                return@launch
+            }
+            container.logger.info("Service", "Start requested from app")
+            runCatching { BotForegroundService.start(context, allowMobileNetwork) }
+                .onFailure { container.logger.error("Service", "Could not request bot service start", it) }
+        }
+    }
+
+    fun stopBot(context: Context) {
+        viewModelScope.launch {
+            container.logger.info("Service", "Stop requested from app")
+            runCatching {
+                context.startService(Intent(context, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP))
+            }.onFailure {
+                container.logger.error("Service", "Could not request bot service stop", it)
+            }
+        }
+    }
 
     fun updateSettings(transform: (BotSettingsEntity) -> BotSettingsEntity) {
         viewModelScope.launch { container.settings.update(transform) }
@@ -129,7 +172,31 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    private fun diagnosticTitle(connection: WhatsAppConnectionState, hasSession: Boolean): String = when {
+        !hasSession -> "WhatsApp session missing"
+        connection is WhatsAppConnectionState.Error -> "Bot error"
+        connection == WhatsAppConnectionState.Disconnected -> "Bot is stopped"
+        connection == WhatsAppConnectionState.Connecting -> "Connecting to WhatsApp"
+        connection == WhatsAppConnectionState.Running -> "Bot is running"
+        connection is WhatsAppConnectionState.WaitingForQr -> "Waiting for WhatsApp pairing"
+        else -> "WhatsApp connected"
+    }
+
+    private fun diagnosticDetail(connection: WhatsAppConnectionState, hasSession: Boolean): String = when {
+        !hasSession -> "Open Settings, generate a Linked Devices code, and pair WhatsApp again."
+        connection is WhatsAppConnectionState.Error -> connection.message
+        connection == WhatsAppConnectionState.Disconnected -> "Tap Start bot after WhatsApp is paired. Recent runtime events appear here and in Logs."
+        connection == WhatsAppConnectionState.Connecting -> "The foreground service is starting the WhatsApp linked-device bridge."
+        connection == WhatsAppConnectionState.Running -> "The service is active and listening only to private WhatsApp chats."
+        connection is WhatsAppConnectionState.WaitingForQr -> connection.qrData
+        else -> "The WhatsApp bridge reported a connected state."
+    }
+
     class Factory(private val container: AppContainer) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(container) as T
+    }
+
+    private companion object {
+        val DIAGNOSTIC_TAGS = setOf("Service", "WhatsApp", "Queue", "BotEngine", "BootReceiver")
     }
 }
